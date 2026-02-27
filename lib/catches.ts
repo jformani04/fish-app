@@ -15,6 +15,7 @@ export interface CatchLog {
   method: string;
   notes: string;
   isPublic: boolean;
+  isFavorite: boolean;
   hideLocation: boolean;
   date: string;
 }
@@ -33,6 +34,7 @@ type CatchLogRow = {
   method: string | null;
   notes: string | null;
   is_public: boolean | null;
+  is_favorite: boolean | null;
   hide_location: boolean | null;
   date: string | null;
   created_at: string;
@@ -50,6 +52,7 @@ type CatchLogUpdateRow = {
   method: string;
   notes: string;
   is_public: boolean;
+  is_favorite: boolean;
   hide_location: boolean;
   date: string;
 };
@@ -63,6 +66,19 @@ function debugLog(message: string, payload?: unknown) {
     return;
   }
   console.log(`[catches] ${message}`, payload);
+}
+
+function isMissingColumnError(error: any, column: string): boolean {
+  const message = String(error?.message ?? "").toLowerCase();
+  return message.includes(column) && message.includes("schema cache");
+}
+
+function stripOptionalColumns<T extends Record<string, any>>(payload: T, columns: string[]) {
+  const cloned = { ...payload };
+  for (const key of columns) {
+    delete cloned[key];
+  }
+  return cloned;
 }
 
 export function mapCatchLogRowToCatchLog(row: CatchLogRow): CatchLog {
@@ -79,6 +95,7 @@ export function mapCatchLogRowToCatchLog(row: CatchLogRow): CatchLog {
     method: row.method ?? "",
     notes: row.notes ?? "",
     isPublic: row.is_public ?? false,
+    isFavorite: row.is_favorite ?? false,
     hideLocation: row.hide_location ?? false,
     date: row.date ?? "",
   };
@@ -97,6 +114,7 @@ export function mapCatchLogToUpdateRow(catchLog: CatchLog): CatchLogUpdateRow {
     method: catchLog.method,
     notes: catchLog.notes,
     is_public: catchLog.isPublic,
+    is_favorite: catchLog.isFavorite,
     hide_location: catchLog.hideLocation,
     date: catchLog.date,
   };
@@ -119,6 +137,24 @@ export async function getUserCatchLogs(userId: string): Promise<CatchLog[]> {
   const rows = (data ?? []) as CatchLogRow[];
   debugLog("fetch count", rows.length);
   return rows.map(mapCatchLogRowToCatchLog);
+}
+
+export async function getUserFavoriteCatchLogs(userId: string): Promise<CatchLog[]> {
+  const all = await getUserCatchLogs(userId);
+  return all.filter((row) => row.isFavorite);
+}
+
+export function getCatchStats(catches: CatchLog[]) {
+  const speciesSet = new Set(
+    catches
+      .map((item) => item.species.trim().toLowerCase())
+      .filter((item) => item.length > 0)
+  );
+
+  return {
+    totalCatches: catches.length,
+    speciesCount: speciesSet.size,
+  };
 }
 
 export async function getCatchLogById(
@@ -151,11 +187,27 @@ export async function updateCatchLog(catchLog: CatchLog): Promise<void> {
 
   debugLog("update catch user_id", user.id);
 
-  const { error } = await supabase
+  const payload = mapCatchLogToUpdateRow(catchLog);
+
+  let { error } = await supabase
     .from("catch_logs")
-    .update(mapCatchLogToUpdateRow(catchLog))
+    .update(payload)
     .eq("id", catchLog.id)
     .eq("user_id", user.id);
+
+  if (
+    error &&
+    (isMissingColumnError(error, "hide_location") ||
+      isMissingColumnError(error, "is_favorite"))
+  ) {
+    const legacyPayload = stripOptionalColumns(payload, ["hide_location", "is_favorite"]);
+    const retry = await supabase
+      .from("catch_logs")
+      .update(legacyPayload)
+      .eq("id", catchLog.id)
+      .eq("user_id", user.id);
+    error = retry.error;
+  }
 
   if (error) {
     debugLog("update failed", error);
@@ -189,11 +241,21 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<void> 
     method: input.method,
     notes: input.notes,
     is_public: input.isPublic,
+    is_favorite: input.isFavorite,
     hide_location: input.hideLocation,
     date: input.date,
   };
 
-  const { error } = await supabase.from("catch_logs").insert(payload);
+  let { error } = await supabase.from("catch_logs").insert(payload);
+  if (
+    error &&
+    (isMissingColumnError(error, "hide_location") ||
+      isMissingColumnError(error, "is_favorite"))
+  ) {
+    const legacyPayload = stripOptionalColumns(payload, ["hide_location", "is_favorite"]);
+    const retry = await supabase.from("catch_logs").insert(legacyPayload);
+    error = retry.error;
+  }
   if (error) {
     debugLog("create failed", error);
     throw error;
@@ -248,11 +310,21 @@ export async function seedDevCatchLog(userId: string): Promise<void> {
     lure: "Plastic worm",
     method: "Spin",
     notes: "Dev seeded catch for testing.",
-    is_public: false,
+    is_public: true,
+    is_favorite: false,
     hide_location: false,
     date,
   };
 
-  const { error } = await supabase.from("catch_logs").insert(payload);
+  let { error } = await supabase.from("catch_logs").insert(payload);
+  if (
+    error &&
+    (isMissingColumnError(error, "hide_location") ||
+      isMissingColumnError(error, "is_favorite"))
+  ) {
+    const legacyPayload = stripOptionalColumns(payload, ["hide_location", "is_favorite"]);
+    const retry = await supabase.from("catch_logs").insert(legacyPayload);
+    error = retry.error;
+  }
   if (error) throw error;
 }

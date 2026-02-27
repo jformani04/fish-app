@@ -1,7 +1,10 @@
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/auth/AuthProvider";
 import { COLORS } from "@/lib/colors";
+import { getCatchStats, getUserCatchLogs } from "@/lib/catches";
 import { router } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
+import { useEffect, useState } from "react";
 import {
   Clock,
   Eye,
@@ -27,6 +30,8 @@ import ScanButton from "../../components/ScanButton";
 export default function Home() {
   const { width } = useWindowDimensions();
   const { profile, loading } = useAuth();
+  const isFocused = useIsFocused();
+  const [stats, setStats] = useState({ totalCatches: 0, speciesCount: 0 });
 
   // Two-column card width calculation
   const H_PADDING = 48;
@@ -39,6 +44,27 @@ export default function Home() {
       router.replace("/");
     }
   };
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const loadStats = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setStats({ totalCatches: 0, speciesCount: 0 });
+        return;
+      }
+
+      const catches = await getUserCatchLogs(user.id);
+      setStats(getCatchStats(catches));
+    };
+
+    loadStats().catch(() => {
+      setStats({ totalCatches: 0, speciesCount: 0 });
+    });
+  }, [isFocused]);
 
   if (loading) {
     return (
@@ -58,16 +84,18 @@ export default function Home() {
       {/* Header with avatar */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          {profile?.avatar_url ? (
-            <Image
-              source={{ uri: profile.avatar_url }}
-              style={styles.avatar}
-            />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <User size={28} color={COLORS.primary} />
-            </View>
-          )}
+          <Pressable onPress={() => router.push("/(tabs)/profile")}>
+            {profile?.avatar_url ? (
+              <Image
+                source={{ uri: profile.avatar_url }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <User size={28} color={COLORS.primary} />
+              </View>
+            )}
+          </Pressable>
           <View style={styles.headerText}>
             <Text style={styles.title}>Anglr</Text>
             <Text style={styles.subtitle}>
@@ -103,7 +131,10 @@ export default function Home() {
           <Text style={styles.actionText}>View Catches</Text>
         </Pressable>
 
-        <Pressable style={[styles.actionBubble, { width: cardWidth }]}>
+        <Pressable
+          style={[styles.actionBubble, { width: cardWidth }]}
+          onPress={() => router.push("/(tabs)/favorites")}
+        >
           <View style={styles.actionIcon}>
             <Heart size={20} color={COLORS.primary} />
           </View>
@@ -132,7 +163,7 @@ export default function Home() {
             </View>
             <Text style={styles.statLabel}>Total Catches</Text>
           </View>
-          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statValue}>{stats.totalCatches}</Text>
         </View>
 
         <View style={[styles.statBubble, { width: cardWidth }]}>
@@ -142,7 +173,7 @@ export default function Home() {
             </View>
             <Text style={styles.statLabel}>Species</Text>
           </View>
-          <Text style={styles.statValue}>0</Text>
+          <Text style={styles.statValue}>{stats.speciesCount}</Text>
         </View>
       </View>
 

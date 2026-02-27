@@ -23,6 +23,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FRESHWATER_SPECIES, getSpeciesMatches } from "@/lib/freshwaterSpecies";
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
 
@@ -40,6 +41,7 @@ const EMPTY_FORM: CatchLogForm = {
   method: "",
   notes: "",
   isPublic: false,
+  isFavorite: false,
   hideLocation: false,
   date: "",
 };
@@ -54,6 +56,8 @@ export default function EditCatchScreen() {
     "idle"
   );
   const [form, setForm] = useState<CatchLogForm>(EMPTY_FORM);
+  const [speciesQuery, setSpeciesQuery] = useState("");
+  const [showSpeciesMatches, setShowSpeciesMatches] = useState(false);
   const hasLoadedInitialData = useRef(false);
   const lastSavedSnapshot = useRef<string>("");
 
@@ -81,6 +85,7 @@ export default function EditCatchScreen() {
 
         const { id, ...rest } = catchLog;
         setForm(rest);
+        setSpeciesQuery(rest.species);
         lastSavedSnapshot.current = JSON.stringify(rest);
         hasLoadedInitialData.current = true;
       } catch (err: any) {
@@ -97,7 +102,7 @@ export default function EditCatchScreen() {
     setForm((prev) => ({ ...prev, [field]: value } as CatchLogForm));
   };
 
-  const handleSave = async (silent = false) => {
+  const handleSave = async () => {
     if (!catchId) return;
 
     try {
@@ -112,14 +117,8 @@ export default function EditCatchScreen() {
 
       lastSavedSnapshot.current = JSON.stringify(form);
       setSaveStatus("saved");
-      if (!silent) {
-        Alert.alert("Saved", "Catch updated successfully.");
-      }
     } catch (err: any) {
       setSaveStatus("error");
-      if (!silent) {
-        Alert.alert("Save Failed", err?.message ?? "Unable to update catch.");
-      }
       setError(err?.message ?? "Unable to update catch.");
     } finally {
       setSaving(false);
@@ -134,7 +133,7 @@ export default function EditCatchScreen() {
     if (snapshot === lastSavedSnapshot.current) return;
 
     const timer = setTimeout(() => {
-      handleSave(true);
+      handleSave();
     }, 700);
 
     return () => clearTimeout(timer);
@@ -162,6 +161,11 @@ export default function EditCatchScreen() {
       },
     ]);
   };
+
+  const speciesMatches = getSpeciesMatches(speciesQuery);
+  const hasExactSpeciesSelection = FRESHWATER_SPECIES.some(
+    (species) => species.toLowerCase() === speciesQuery.trim().toLowerCase()
+  );
 
   if (loading) {
     return (
@@ -227,11 +231,57 @@ export default function EditCatchScreen() {
           <Text style={styles.sectionLabel}>Species</Text>
           <TextInput
             style={styles.input}
-            placeholder="Species"
+            placeholder="Search species"
             placeholderTextColor={COLORS.textSecondary}
-            value={form.species}
-            onChangeText={(v) => setField("species", v)}
+            value={speciesQuery}
+            onChangeText={(v) => {
+              setSpeciesQuery(v);
+              setShowSpeciesMatches(true);
+
+              const exactMatch = FRESHWATER_SPECIES.find(
+                (species) => species.toLowerCase() === v.trim().toLowerCase()
+              );
+              if (exactMatch) {
+                setField("species", exactMatch);
+              }
+            }}
+            onFocus={() => setShowSpeciesMatches(true)}
+            onBlur={() => {
+              setTimeout(() => {
+                setShowSpeciesMatches(false);
+                if (!hasExactSpeciesSelection) {
+                  setSpeciesQuery(form.species);
+                }
+              }, 120);
+            }}
           />
+          {showSpeciesMatches && (
+            <View style={styles.speciesOptions}>
+              {speciesMatches.map((species) => (
+                <Pressable
+                  key={species}
+                  onPress={() => {
+                    setField("species", species);
+                    setSpeciesQuery(species);
+                    setShowSpeciesMatches(false);
+                  }}
+                  style={styles.speciesOption}
+                >
+                  <Text style={styles.speciesOptionText}>{species}</Text>
+                </Pressable>
+              ))}
+              {speciesMatches.length === 0 && (
+                <Text style={styles.speciesHint}>
+                  No matches. Keep typing to find a valid species.
+                </Text>
+              )}
+            </View>
+          )}
+          {!hasExactSpeciesSelection && speciesQuery.trim().length > 0 && (
+            <Text style={styles.inlineError}>
+              Please select a species from the dropdown options.
+            </Text>
+          )}
 
           <View style={styles.row}>
             <View style={styles.rowItem}>
@@ -366,6 +416,26 @@ export default function EditCatchScreen() {
             />
           </View>
 
+          <View style={styles.toggleRow}>
+            <View>
+              <Text style={styles.toggleTitle}>
+                {form.isFavorite ? "Favorited" : "Add to Favorites"}
+              </Text>
+              <Text style={styles.toggleSubtitle}>
+                Favorited catches appear on the Favorites page
+              </Text>
+            </View>
+            <Switch
+              value={form.isFavorite}
+              onValueChange={(v) => setField("isFavorite", v)}
+              trackColor={{
+                false: "rgba(221,220,219,0.2)",
+                true: COLORS.primary,
+              }}
+              thumbColor={COLORS.text}
+            />
+          </View>
+
           {!!error && <Text style={styles.inlineError}>{error}</Text>}
 
           <Text style={styles.saveStatusText}>
@@ -379,16 +449,6 @@ export default function EditCatchScreen() {
                     ? "Autosave failed"
                     : "Changes save automatically"}
           </Text>
-
-          <Pressable
-            style={[styles.primaryButton, saving && { opacity: 0.7 }]}
-            onPress={() => handleSave(false)}
-            disabled={saving || deleting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {saving ? "Saving..." : "Save Changes"}
-            </Text>
-          </Pressable>
 
           <Pressable
             style={[styles.deleteButton, deleting && { opacity: 0.7 }]}
@@ -484,6 +544,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
+  },
+  speciesOptions: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.2)",
+    overflow: "hidden",
+  },
+  speciesOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  },
+  speciesOptionText: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  speciesHint: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   notesInput: {
     minHeight: 100,

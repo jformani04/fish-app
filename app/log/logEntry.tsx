@@ -46,7 +46,7 @@ export default function LogEntry() {
   const isCompact = width < 400;
 
   const [selectedSpecies, setSelectedSpecies] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true);
   const [hideLocation, setHideLocation] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -64,7 +64,7 @@ export default function LogEntry() {
   useEffect(() => {
     // Always start a fresh log when a new scan/photo opens this route.
     setSelectedSpecies("");
-    setIsPublic(false);
+    setIsPublic(true);
     setHideLocation(false);
     setFormData({
       species: "",
@@ -119,6 +119,7 @@ export default function LogEntry() {
         method: formData.method,
         notes: formData.notes,
         isPublic,
+        isFavorite: false,
         hideLocation,
         date,
       });

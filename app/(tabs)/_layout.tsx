@@ -22,8 +22,10 @@ export default function TabsLayout() {
       initialRouteName="home"
     >
       <Stack.Screen name="home" />
-      <Stack.Screen name="catches/index" />
+      <Stack.Screen name="catches" />
       <Stack.Screen name="catches/[catchId]" />
+      <Stack.Screen name="favorites" />
+      <Stack.Screen name="profile" />
     </Stack>
   );
 }
