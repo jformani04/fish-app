@@ -1,16 +1,17 @@
 import { Stack } from "expo-router";
 import { useEffect } from "react";
-import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
+import { useAuth } from "@/auth/AuthProvider";
 
 export default function TabsLayout() {
+  const { user, loading } = useAuth();
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (!data.session) {
-        router.replace("../");
-      }
-    });
-  }, []);
+    if (loading) return;
+    if (!user) {
+      router.replace("/");
+    }
+  }, [loading, user]);
 
   return (
     <Stack
@@ -21,6 +22,8 @@ export default function TabsLayout() {
       initialRouteName="home"
     >
       <Stack.Screen name="home" />
+      <Stack.Screen name="catches/index" />
+      <Stack.Screen name="catches/[catchId]" />
     </Stack>
   );
 }

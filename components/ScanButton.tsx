@@ -5,8 +5,8 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
 function handleImage(uri: string) {
   router.push({
-    pathname: "/",
-    params: { imageUri: uri },
+    pathname: "/log/logEntry",
+    params: { imageUri: uri, draftId: Date.now().toString() },
   });
 }
 

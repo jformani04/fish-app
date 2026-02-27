@@ -1,16 +1,20 @@
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/auth/AuthProvider";
+import { COLORS } from "@/lib/colors";
 import { router } from "expo-router";
 import {
-  Camera,
   Clock,
   Eye,
   Fish,
   Heart,
   Library,
+  LogOut,
   TrendingUp,
   User,
 } from "lucide-react-native";
 import {
+  ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,10 +22,11 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import ScanButton from "../../components/ScanButton"
+import ScanButton from "../../components/ScanButton";
 
 export default function Home() {
   const { width } = useWindowDimensions();
+  const { profile, loading } = useAuth();
 
   // Two-column card width calculation
   const H_PADDING = 48;
@@ -35,44 +40,81 @@ export default function Home() {
     }
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading your profile...</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 48 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
+      {/* Header with avatar */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Anglr</Text>
-          <Text style={styles.subtitle}>Welcome back, angler</Text>
+        <View style={styles.headerLeft}>
+          {profile?.avatar_url ? (
+            <Image
+              source={{ uri: profile.avatar_url }}
+              style={styles.avatar}
+            />
+          ) : (
+            <View style={styles.avatarFallback}>
+              <User size={28} color={COLORS.primary} />
+            </View>
+          )}
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Anglr</Text>
+            <Text style={styles.subtitle}>
+              Welcome back
+              {profile?.username ? `, ${profile.username}` : ""}!
+            </Text>
+          </View>
         </View>
 
-        <Pressable style={styles.profileButton} onPress={handleSignOut}>
-          <User size={22} color="#B8B7B6" />
+        <Pressable style={styles.signOutButton} onPress={handleSignOut}>
+          <LogOut size={20} color={COLORS.textSecondary} />
         </Pressable>
       </View>
-      <ScanButton/>
+
+      {/* Bio bubble */}
+      {profile?.bio ? (
+        <View style={styles.bioBubble}>
+          <Text style={styles.bioText}>{profile.bio}</Text>
+        </View>
+      ) : null}
+
+      <ScanButton />
+
       <Text style={styles.sectionLabel}>Quick Actions</Text>
       <View style={styles.rowGrid}>
-        <Pressable style={[styles.actionBubble, { width: cardWidth }]}>
+        <Pressable
+          style={[styles.actionBubble, { width: cardWidth }]}
+          onPress={() => router.push("/(tabs)/catches")}
+        >
           <View style={styles.actionIcon}>
-            <Eye size={20} color="#FD7B41" />
+            <Eye size={20} color={COLORS.primary} />
           </View>
           <Text style={styles.actionText}>View Catches</Text>
         </Pressable>
 
         <Pressable style={[styles.actionBubble, { width: cardWidth }]}>
           <View style={styles.actionIcon}>
-            <Heart size={20} color="#FD7B41" />
+            <Heart size={20} color={COLORS.primary} />
           </View>
           <Text style={styles.actionText}>Favorites</Text>
         </Pressable>
       </View>
+
       <Pressable style={styles.fullBubble}>
         <View style={styles.row}>
           <View style={styles.actionIcon}>
-            <Library size={20} color="#FD7B41" />
+            <Library size={20} color={COLORS.primary} />
           </View>
           <View style={styles.fullBubbleContent}>
             <Text style={styles.actionText}>Species Guide</Text>
@@ -80,12 +122,13 @@ export default function Home() {
           </View>
         </View>
       </Pressable>
+
       <Text style={styles.sectionLabel}>Your Stats</Text>
       <View style={styles.rowGrid}>
         <View style={[styles.statBubble, { width: cardWidth }]}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
-              <TrendingUp size={14} color="#FD7B41" />
+              <TrendingUp size={14} color={COLORS.primary} />
             </View>
             <Text style={styles.statLabel}>Total Catches</Text>
           </View>
@@ -95,18 +138,19 @@ export default function Home() {
         <View style={[styles.statBubble, { width: cardWidth }]}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
-              <Fish size={14} color="#FD7B41" />
+              <Fish size={14} color={COLORS.primary} />
             </View>
             <Text style={styles.statLabel}>Species</Text>
           </View>
           <Text style={styles.statValue}>0</Text>
         </View>
       </View>
+
       <Text style={styles.sectionLabel}>Recent Activity</Text>
       <View style={styles.activityBubble}>
         <View style={styles.row}>
           <View style={styles.actionIcon}>
-            <Clock size={18} color="#FD7B41" />
+            <Clock size={18} color={COLORS.primary} />
           </View>
           <View style={styles.activityContent}>
             <Text style={styles.activityTitle}>No recent activity</Text>
@@ -121,9 +165,22 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+
+  loadingText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+  },
+
   container: {
     flex: 1,
-    backgroundColor: "#3C4044",
+    backgroundColor: COLORS.background,
     paddingHorizontal: 24,
   },
 
@@ -135,20 +192,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    flex: 1,
+  },
+
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+
+  avatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 999,
+    backgroundColor: "rgba(253,123,65,0.2)",
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  headerText: {
+    flex: 1,
+  },
+
   title: {
     fontSize: 32,
-    color: "#DDDCDB",
+    color: COLORS.text,
     fontWeight: "700",
     letterSpacing: -1,
   },
 
   subtitle: {
-    color: "#FD7B41",
+    color: COLORS.primary,
     fontSize: 14,
     marginTop: 4,
   },
 
-  profileButton: {
+  signOutButton: {
     padding: 12,
     borderRadius: 999,
     backgroundColor: "rgba(221,220,219,0.1)",
@@ -156,9 +243,25 @@ const styles = StyleSheet.create({
     borderColor: "rgba(221,220,219,0.2)",
   },
 
+  bioBubble: {
+    backgroundColor: "rgba(221,220,219,0.08)",
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+
+  bioText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontStyle: "italic",
+    lineHeight: 20,
+  },
 
   sectionLabel: {
-    color: "#B8B7B6",
+    color: COLORS.textSecondary,
     fontSize: 12,
     letterSpacing: 2,
     textTransform: "uppercase",
@@ -199,12 +302,12 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#DDDCDB",
+    color: "white",
   },
 
   actionSubtext: {
     fontSize: 13,
-    color: "#B8B7B6",
+    color: COLORS.textSecondary,
     marginTop: 2,
   },
 
@@ -224,13 +327,13 @@ const styles = StyleSheet.create({
   },
 
   statLabel: {
-    color: "#B8B7B6",
+    color: COLORS.textSecondary,
     fontSize: 13,
   },
 
   statValue: {
     fontSize: 28,
-    color: "#DDDCDB",
+    color: COLORS.text,
     fontWeight: "700",
     marginTop: 8,
   },
@@ -244,13 +347,13 @@ const styles = StyleSheet.create({
   },
 
   activityTitle: {
-    color: "#DDDCDB",
+    color: COLORS.text,
     fontSize: 15,
     fontWeight: "500",
   },
 
   activitySub: {
-    color: "#B8B7B6",
+    color: COLORS.textSecondary,
     fontSize: 13,
     marginTop: 4,
   },

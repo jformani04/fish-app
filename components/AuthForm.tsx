@@ -93,6 +93,17 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      Alert.alert("Google Login Error", err?.message ?? "Unexpected error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.card}>
       <TextInput
@@ -139,7 +150,11 @@ export default function AuthForm({ mode }: AuthFormProps) {
         <View style={styles.line} />
       </View>
 
-      <Pressable style={styles.googleButton} onPress={signInWithGoogle}>
+      <Pressable
+        style={[styles.googleButton, loading && { opacity: 0.7 }]}
+        onPress={handleGoogleSignIn}
+        disabled={loading}
+      >
         <Image source={google_icon} style={styles.googleIcon} />
         <Text style={styles.googleText}>
           {isLogin ? "Sign in with Google" : "Sign up with Google"}
