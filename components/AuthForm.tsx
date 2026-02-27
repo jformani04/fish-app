@@ -1,11 +1,23 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, Image, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, Image, StyleSheet } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
 import { signInWithGoogle } from "@/auth/google";
 import { COLORS } from "@/lib/colors";
+import {
+  mapAuthErrorMessage,
+  sanitizeInput,
+  validateConfirmPassword,
+  validateEmail,
+  validateLoginPassword,
+  validateRegisterPassword,
+  validateUsername,
+} from "@/lib/validation/authValidation";
 
 const google_icon = require("@/assets/images/google_icon.png");
+const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
+const GOOGLE_ONLY_LOGIN_MESSAGE =
+  "This email is registered with Google. Please sign in with Google.";
 
 type AuthMode = "login" | "register";
 
@@ -13,92 +25,212 @@ type AuthFormProps = {
   mode: AuthMode;
 };
 
+type AuthResult =
+  | { success: true; session?: any; message?: string }
+  | { success: false; error: string };
+
 export default function AuthForm({ mode }: AuthFormProps) {
+  const isLogin = mode === "login";
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oauthHint, setOauthHint] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const isLogin = mode === "login";
+  const clearErrors = () => {
+    setFormError(null);
+    setOauthHint(null);
+  };
 
-  const loginWithEmail = async (email: string, password: string) => {
+  const validateBeforeSubmit = () => {
+    const normalizedEmail = sanitizeInput(email);
+    const normalizedPassword = sanitizeInput(password);
+    const normalizedConfirm = sanitizeInput(confirmPassword);
+    const normalizedUsername = sanitizeInput(username);
+
+    const emailValidation = validateEmail(normalizedEmail);
+    if (!emailValidation.valid) {
+      return { valid: false, error: emailValidation.message };
+    }
+
+    if (isLogin) {
+      const pwValidation = validateLoginPassword(normalizedPassword);
+      if (!pwValidation.valid) {
+        return { valid: false, error: pwValidation.message };
+      }
+
+      return {
+        valid: true,
+        payload: {
+          email: normalizedEmail,
+          password: normalizedPassword,
+          username: "",
+        },
+      };
+    }
+
+    const usernameValidation = validateUsername(normalizedUsername);
+    if (!usernameValidation.valid) {
+      return { valid: false, error: usernameValidation.message };
+    }
+
+    const registerPwValidation = validateRegisterPassword(normalizedPassword);
+    if (!registerPwValidation.valid) {
+      return { valid: false, error: registerPwValidation.message };
+    }
+
+    const confirmValidation = validateConfirmPassword(normalizedPassword, normalizedConfirm);
+    if (!confirmValidation.valid) {
+      return { valid: false, error: confirmValidation.message };
+    }
+
+    return {
+      valid: true,
+      payload: {
+        email: normalizedEmail,
+        password: normalizedPassword,
+        username: normalizedUsername,
+      },
+    };
+  };
+
+  const loginWithEmail = async (
+    emailValue: string,
+    passwordValue: string
+  ): Promise<AuthResult> => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailValue,
+        password: passwordValue,
+      });
 
       if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          const { data: usersData, error: fetchError } = await supabase
-            .from("profiles") 
-            .select("id, email, app_metadata")
-            .eq("email", email)
-            .single();
+        const friendly = mapAuthErrorMessage(error.message);
+        if (error.message.toLowerCase().includes("invalid login credentials")) {
+          try {
+            const lookup = await supabase.functions.invoke("lookup_auth_providers", {
+              body: { email: emailValue },
+            });
 
-          if (!fetchError && usersData?.app_metadata?.provider === "google") {
-            return {
-              success: false,
-              error:
-                "This account was created with Google. Please use the Google login button.",
-            };
+            const providers = (lookup.data?.providers as string[] | undefined) ?? [];
+            if (DEBUG) {
+              console.log("[auth] provider lookup", {
+                email: emailValue,
+                exists: lookup.data?.exists,
+                providers,
+              });
+            }
+
+            if (providers.includes("google") && !providers.includes("email")) {
+              setOauthHint(GOOGLE_ONLY_LOGIN_MESSAGE);
+              return { success: false, error: GOOGLE_ONLY_LOGIN_MESSAGE };
+            }
+          } catch (lookupErr) {
+            if (DEBUG) console.log("[auth] lookup_auth_providers failed", lookupErr);
           }
         }
 
-        return { success: false, error: error.message };
+        return { success: false, error: friendly };
       }
 
       if (data.session) {
-        router.replace("/(tabs)/home"); // redirect after successful login
+        router.replace("/(tabs)/home");
         return { success: true, session: data.session };
       }
 
       return { success: false, error: "Unknown login error" };
     } catch (err) {
-      console.log("Unexpected login error:", err);
-      return { success: false, error: "Unexpected error" };
+      if (DEBUG) console.log("Unexpected login error", err);
+      return { success: false, error: "Network error. Please try again." };
     }
   };
 
-  // Function to handle email/password registration
-  const registerWithEmail = async (email: string, password: string) => {
+  const registerWithEmail = async (
+    usernameValue: string,
+    emailValue: string,
+    passwordValue: string
+  ): Promise<AuthResult> => {
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email: emailValue,
+        password: passwordValue,
+        options: {
+          data: { username: usernameValue },
+        },
+      });
 
       if (error) {
-        return { success: false, error: error.message };
+        return { success: false, error: mapAuthErrorMessage(error.message) };
+      }
+
+      if (data.session) {
+        router.replace("/(tabs)/home");
+        return { success: true, session: data.session };
       }
 
       if (data.user) {
-        router.replace("/(tabs)/home"); // redirect after registration
-        return { success: true, user: data.user };
+        return {
+          success: true,
+          message: "Account created. Please check your email to confirm your account.",
+        };
       }
 
       return { success: false, error: "Unknown registration error" };
     } catch (err) {
-      console.log("Unexpected registration error:", err);
-      return { success: false, error: "Unexpected error" };
+      if (DEBUG) console.log("Unexpected registration error", err);
+      return { success: false, error: "Network error. Please try again." };
     }
   };
 
-  // Unified handler for the button
   const handleSubmit = async () => {
-    setLoading(true);
-    let result;
-    if (isLogin) {
-      result = await loginWithEmail(email, password);
-    } else {
-      result = await registerWithEmail(email, password);
+    if (loading) return;
+
+    clearErrors();
+    const validation = validateBeforeSubmit();
+    if (!validation.valid) {
+      setFormError(validation.error ?? "Please check your input.");
+      return;
     }
+
+    setLoading(true);
+    let result: AuthResult;
+
+    if (isLogin) {
+      result = await loginWithEmail(validation.payload!.email, validation.payload!.password);
+    } else {
+      result = await registerWithEmail(
+        validation.payload!.username,
+        validation.payload!.email,
+        validation.payload!.password
+      );
+    }
+
     setLoading(false);
 
-    if (!result.success && result.error) {
-      Alert.alert("Error", result.error);
+    if (!result.success) {
+      if (result.error === GOOGLE_ONLY_LOGIN_MESSAGE) {
+        setFormError(null);
+        return;
+      }
+      setFormError(result.error);
+      return;
+    }
+
+    if (result.message) {
+      setFormError(result.message);
     }
   };
 
   const handleGoogleSignIn = async () => {
+    if (loading) return;
+    clearErrors();
     setLoading(true);
     try {
       await signInWithGoogle();
     } catch (err: any) {
-      Alert.alert("Google Login Error", err?.message ?? "Unexpected error");
+      setFormError(err?.message ?? "Unexpected error");
     } finally {
       setLoading(false);
     }
@@ -106,6 +238,20 @@ export default function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <View style={styles.card}>
+      {!isLogin && (
+        <TextInput
+          placeholder="Username"
+          placeholderTextColor={COLORS.textSecondary}
+          style={styles.input}
+          autoCapitalize="none"
+          value={username}
+          onChangeText={(value) => {
+            setUsername(value);
+            clearErrors();
+          }}
+        />
+      )}
+
       <TextInput
         placeholder="hello@company.com"
         placeholderTextColor={COLORS.textSecondary}
@@ -113,7 +259,10 @@ export default function AuthForm({ mode }: AuthFormProps) {
         autoCapitalize="none"
         keyboardType="email-address"
         value={email}
-        onChangeText={setEmail}
+        onChangeText={(value) => {
+          setEmail(value);
+          clearErrors();
+        }}
       />
 
       <TextInput
@@ -122,14 +271,34 @@ export default function AuthForm({ mode }: AuthFormProps) {
         secureTextEntry
         style={styles.input}
         value={password}
-        onChangeText={setPassword}
+        onChangeText={(value) => {
+          setPassword(value);
+          clearErrors();
+        }}
       />
 
+      {!isLogin && (
+        <TextInput
+          placeholder="Confirm Password"
+          placeholderTextColor={COLORS.textSecondary}
+          secureTextEntry
+          style={styles.input}
+          value={confirmPassword}
+          onChangeText={(value) => {
+            setConfirmPassword(value);
+            clearErrors();
+          }}
+        />
+      )}
+
+      {formError && (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>{formError}</Text>
+        </View>
+      )}
+
       {isLogin && (
-        <Text
-          onPress={() => router.push("/forgot_password")}
-          style={styles.forgotPassword}
-        >
+        <Text onPress={() => router.push("/forgot_password")} style={styles.forgotPassword}>
           Forgot Password?
         </Text>
       )}
@@ -143,6 +312,12 @@ export default function AuthForm({ mode }: AuthFormProps) {
           {loading ? "LOADING..." : isLogin ? "LOGIN" : "REGISTER"}
         </Text>
       </Pressable>
+
+      {isLogin && oauthHint && (
+        <View style={styles.oauthHintCard}>
+          <Text style={styles.oauthHintText}>{oauthHint}</Text>
+        </View>
+      )}
 
       <View style={styles.orContainer}>
         <View style={styles.line} />
@@ -179,6 +354,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 16,
   },
+  errorCard: {
+    marginTop: -6,
+    marginBottom: 10,
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: "rgba(239,68,68,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.4)",
+  },
+  errorText: {
+    color: "#fecaca",
+    fontSize: 12,
+    lineHeight: 18,
+  },
   forgotPassword: {
     color: COLORS.text,
     marginBottom: 12,
@@ -195,6 +384,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     letterSpacing: 1,
+  },
+  oauthHintCard: {
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: "rgba(253,123,65,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(253,123,65,0.45)",
+  },
+  oauthHintText: {
+    color: COLORS.text,
+    fontSize: 13,
   },
   orContainer: {
     flexDirection: "row",
