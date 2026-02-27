@@ -48,6 +48,8 @@ app-example
 **/.cache/
 .android/
 **/.android/
+supabase/.temp/
+.claude/settings.local.json
 
 # Android Emulator
 *.avd
