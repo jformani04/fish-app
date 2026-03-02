@@ -28,6 +28,7 @@ import {
 import { FRESHWATER_SPECIES, getSpeciesMatches } from "@/lib/freshwaterSpecies";
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
+const CAMERA_ICON = require("@/assets/images/camera.png");
 const LENGTH_UNITS: LengthUnit[] = ["cm", "in"];
 const WEIGHT_UNITS: WeightUnit[] = ["kg", "lbs"];
 const TEMPERATURE_UNITS = ["c", "f"] as const;
@@ -466,6 +467,7 @@ export default function EditCatchScreen() {
           <Image source={{ uri: form.imageUrl }} style={styles.heroImage} />
         ) : (
           <View style={[styles.heroImage, styles.heroPlaceholder]}>
+            <Image source={CAMERA_ICON} style={styles.heroPlaceholderIcon} />
             <Text style={styles.heroPlaceholderText}>No image</Text>
           </View>
         )}
@@ -993,6 +995,12 @@ const styles = StyleSheet.create({
   },
   heroPlaceholderText: {
     color: COLORS.textSecondary,
+  },
+  heroPlaceholderIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain",
+    marginBottom: 8,
   },
   card: {
     padding: 0,

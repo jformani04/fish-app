@@ -289,7 +289,7 @@ export default function ProfileScreen() {
                   source={{
                     uri:
                       avatarUrl ??
-                      "https://images.unsplash.com/photo-1771006841888-3bd2975bca6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
+                      Image.resolveAssetSource(require("@/assets/images/appIcon.png")).uri,
                   }}
                   style={styles.avatar}
                 />

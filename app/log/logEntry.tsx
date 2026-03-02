@@ -37,7 +37,7 @@ const METHODS = [
 ];
 
 const PLACEHOLDER_IMAGE =
-  "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80";
+  require("@/assets/images/camera.png");
 
 function formatDate(date: Date) {
   return date.toLocaleDateString("en-US", {
@@ -175,9 +175,7 @@ export default function LogEntry() {
     }
   };
 
-  const headerSource = imageUri
-    ? { uri: imageUri }
-    : { uri: PLACEHOLDER_IMAGE };
+  const headerSource = imageUri ? { uri: imageUri } : PLACEHOLDER_IMAGE;
 
   return (
     <KeyboardAvoidingView

@@ -93,7 +93,7 @@ export default function ScanButton() {
 const styles = StyleSheet.create({
   primaryBubble: {
     backgroundColor: "#FD7B41",
-    borderRadius: 28,
+    borderRadius: 36,
     alignItems: "center",
     padding: 28,
     marginBottom: 24,

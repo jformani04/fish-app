@@ -1,7 +1,6 @@
 import { useFonts } from "expo-font";
 import { useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { Fish } from "lucide-react-native";
 import { useEffect } from "react";
 import {
   ImageBackground,
@@ -38,19 +37,13 @@ export default function App() {
       <StatusBar barStyle="light-content" />
 
       <ImageBackground
-        source={{
-          uri: "https://images.unsplash.com/photo-1689692198294-cf1ab7f09246?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkYXJrJTIwZmlzaGluZyUyMHNpbGhvdWV0dGUlMjBzdW5zZXR8ZW58MXx8fHwxNzY5NTU3MTIxfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
-        }}
+        source={require("../assets/images/splashScreenIcon.png")}
         style={styles.background}
         imageStyle={{ opacity: 0.5 }}
       >
         <View style={styles.content}>
           {/* Top Section */}
           <View style={styles.topSection}>
-            <View style={styles.iconContainer}>
-              <Fish color={COLORS.text} size={48} strokeWidth={2} />
-            </View>
-
             <Text style={styles.appName}>Anglr</Text>
 
             <View style={styles.tagline}>
@@ -111,14 +104,9 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginBottom: 56,
-    padding: 24,
-    borderRadius: 9999,
-    backgroundColor: COLORS.primary,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
+    padding: 0,
+    borderRadius: 0,
+    backgroundColor: "transparent",
   },
   appName: {
     fontSize: 60,

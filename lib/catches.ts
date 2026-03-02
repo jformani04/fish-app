@@ -299,8 +299,7 @@ export async function seedDevCatchLog(userId: string): Promise<void> {
 
   const payload = {
     user_id: userId,
-    image_url:
-      "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80",
+    image_url: "",
     species: "Largemouth Bass",
     length: "45 cm",
     weight: "2.3 kg",

@@ -6,7 +6,6 @@ import { router } from "expo-router";
 import {
   ArrowLeft,
   Calendar,
-  Fish as FishIcon,
   MapPin,
   RefreshCcw,
   Ruler,
@@ -22,6 +21,8 @@ import {
   Text,
   View,
 } from "react-native";
+
+const FAVORITES_ICON = require("@/assets/images/favorites.png");
 
 export default function FavoritesScreen() {
   const isFocused = useIsFocused();
@@ -116,7 +117,7 @@ export default function FavoritesScreen() {
       ) : catches.length === 0 ? (
         <View style={styles.centerCard}>
           <View style={styles.emptyIconWrap}>
-            <FishIcon color={COLORS.primary} size={34} strokeWidth={2} />
+            <Image source={FAVORITES_ICON} style={styles.emptyIconImage} />
           </View>
           <Text style={styles.emptyTitle}>No favorites yet</Text>
           <Text style={styles.centerSubtext}>
@@ -136,7 +137,7 @@ export default function FavoritesScreen() {
                   <Image source={{ uri: catchLog.imageUrl }} style={styles.image} />
                 ) : (
                   <View style={[styles.image, styles.imageFallback]}>
-                    <FishIcon color={COLORS.primary} size={28} strokeWidth={2} />
+                    <Image source={FAVORITES_ICON} style={styles.fallbackImageIcon} />
                   </View>
                 )}
                 <View style={styles.imageOverlay} />
@@ -299,12 +300,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   emptyIconWrap: {
-    width: 68,
-    height: 68,
+    width: 84,
+    height: 84,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(253,123,65,0.15)",
+    backgroundColor: "transparent",
+  },
+  emptyIconImage: {
+    width: 84,
+    height: 84,
+    resizeMode: "contain",
   },
   emptyTitle: {
     color: COLORS.text,
@@ -334,6 +340,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  fallbackImageIcon: {
+    width: 36,
+    height: 36,
+    resizeMode: "contain",
   },
   imageOverlay: {
     ...StyleSheet.absoluteFillObject,

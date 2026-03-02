@@ -6,16 +6,11 @@ import { router } from "expo-router";
 import { useIsFocused } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import {
-  Clock,
   Calendar,
-  Eye,
   Fish,
-  Heart,
-  Library,
   LogOut,
   MapPin,
   Ruler,
-  TrendingUp,
   User,
   Weight,
 } from "lucide-react-native";
@@ -30,6 +25,12 @@ import {
   View,
 } from "react-native";
 import ScanButton from "../../components/ScanButton";
+
+const VIEW_CATCHES_ICON = require("@/assets/images/viewCatches.png");
+const FAVORITES_ICON = require("@/assets/images/favorites.png");
+const ARTICLES_ICON = require("@/assets/images/articles.png");
+const TOTAL_CATCHES_ICON = require("@/assets/images/totalCatches.png");
+const CLOCK_ICON = require("@/assets/images/clock.png");
 
 export default function Home() {
   const { width } = useWindowDimensions();
@@ -127,35 +128,39 @@ export default function Home() {
       <Text style={styles.sectionLabel}>Quick Actions</Text>
       <View style={styles.rowGrid}>
         <Pressable
-          style={[styles.actionBubble, { width: cardWidth }]}
+          style={[styles.actionBubble, styles.actionBubbleCentered, { width: cardWidth }]}
           onPress={() => router.push("/catches")}
         >
-          <View style={styles.actionIcon}>
-            <Eye size={20} color={COLORS.primary} />
+          <View style={styles.actionIconCentered}>
+            <Image source={VIEW_CATCHES_ICON} style={styles.actionIconImage} />
           </View>
-          <Text style={styles.actionText}>View Catches</Text>
+          <Text style={[styles.actionText, styles.actionTextCentered]}>View Catches</Text>
         </Pressable>
 
         <Pressable
-          style={[styles.actionBubble, { width: cardWidth }]}
+          style={[styles.actionBubble, styles.actionBubbleCentered, { width: cardWidth }]}
           onPress={() => router.push("/favorites")}
         >
-          <View style={styles.actionIcon}>
-            <Heart size={20} color={COLORS.primary} />
+          <View style={styles.actionIconCentered}>
+            <Image source={FAVORITES_ICON} style={styles.actionIconImage} />
           </View>
-          <Text style={styles.actionText}>Favorites</Text>
+          <Text style={[styles.actionText, styles.actionTextCentered]}>Favorites</Text>
         </Pressable>
       </View>
 
-      <Pressable style={styles.fullBubble}>
-        <View style={styles.row}>
-          <View style={styles.actionIcon}>
-            <Library size={20} color={COLORS.primary} />
-          </View>
-          <View style={styles.fullBubbleContent}>
-            <Text style={styles.actionText}>Species Guide</Text>
-            <Text style={styles.actionSubtext}>Browse and learn</Text>
-          </View>
+      <Pressable
+        style={[styles.fullBubble, styles.fullBubbleCentered]}
+        onPress={() => router.push("/articles")}
+      >
+        <View style={styles.actionIconCentered}>
+          <Image
+            source={ARTICLES_ICON}
+            style={[styles.actionIconImage, styles.speciesGuideIconImage]}
+          />
+        </View>
+        <View style={styles.fullBubbleContentCentered}>
+          <Text style={[styles.actionText, styles.actionTextCentered]}>Species Guide</Text>
+          <Text style={[styles.actionSubtext, styles.actionTextCentered]}>Browse and learn</Text>
         </View>
       </Pressable>
 
@@ -164,7 +169,7 @@ export default function Home() {
         <View style={[styles.statBubble, { width: cardWidth }]}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
-              <TrendingUp size={14} color={COLORS.primary} />
+              <Image source={TOTAL_CATCHES_ICON} style={styles.statIconImage} />
             </View>
             <Text style={styles.statLabel}>Total Catches</Text>
           </View>
@@ -174,7 +179,7 @@ export default function Home() {
         <View style={[styles.statBubble, { width: cardWidth }]}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
-              <Fish size={14} color={COLORS.primary} />
+              <Fish size={28} color={COLORS.primary} />
             </View>
             <Text style={styles.statLabel}>Species</Text>
           </View>
@@ -186,7 +191,7 @@ export default function Home() {
       <View style={styles.activityBubble}>
         <View style={styles.row}>
           <View style={styles.actionIcon}>
-            <Clock size={18} color={COLORS.primary} />
+            <Image source={CLOCK_ICON} style={styles.activityIconImage} />
           </View>
           <View style={styles.activityContent}>
             {recentCatch ? (
@@ -347,7 +352,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "white",
     borderRadius: 24,
-    padding: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  actionBubbleCentered: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   fullBubble: {
@@ -355,22 +365,59 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "white",
     borderRadius: 24,
-    padding: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     marginBottom: 24,
+  },
+  fullBubbleCentered: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   actionIcon: {
-    padding: 10,
+    padding: 0,
     borderRadius: 999,
-    backgroundColor: "rgba(253,123,65,0.2)",
+    backgroundColor: "transparent",
     marginBottom: 8,
     alignSelf: "flex-start",
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionIconPlain: {
+    width: 40,
+    height: 40,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  actionIconCentered: {
+    width: 80,
+    height: 80,
+    marginBottom: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
+  },
+  actionIconImage: {
+    width: 80,
+    height: 80,
+    resizeMode: "contain",
+  },
+  speciesGuideIconImage: {
+    transform: [{ scale: 1.5 }],
   },
 
   actionText: {
     fontSize: 16,
     fontWeight: "600",
     color: "white",
+  },
+  actionTextCentered: {
+    textAlign: "center",
   },
 
   actionSubtext: {
@@ -388,22 +435,27 @@ const styles = StyleSheet.create({
   },
 
   statIcon: {
-    padding: 6,
+    padding: 0,
     borderRadius: 999,
-    backgroundColor: "rgba(253,123,65,0.2)",
+    backgroundColor: "transparent",
     marginRight: 8,
+  },
+  statIconImage: {
+    width: 30,
+    height: 30,
+    resizeMode: "contain",
   },
 
   statLabel: {
     color: COLORS.textSecondary,
     fontSize: 13,
   },
-
   statValue: {
     fontSize: 28,
     color: COLORS.text,
     fontWeight: "700",
     marginTop: 8,
+    textAlign: "center",
   },
 
   activityBubble: {
@@ -440,6 +492,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 11,
   },
+  activityIconImage: {
+    width: 28,
+    height: 28,
+    resizeMode: "contain",
+    transform: [{ scale: 1.25 }],
+  },
 
   row: {
     flexDirection: "row",
@@ -449,6 +507,10 @@ const styles = StyleSheet.create({
 
   fullBubbleContent: {
     flex: 1,
+  },
+  fullBubbleContentCentered: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   activityContent: {

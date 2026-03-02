@@ -3,21 +3,33 @@
     "name": "fish-app",
     "slug": "fish-app",
     "version": "1.0.0",
+    "icon": "./assets/images/appIcon.png",
     "orientation": "portrait",
     "scheme": "fishapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "platforms": ["ios", "android", "web"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/images/appIcon.png"
     },
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.fishr"
+      "package": "com.fishr",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/appIcon.png",
+        "backgroundColor": "#3C4044"
+      }
     },
     "web": {
-      "output": "static"
+      "output": "static",
+      "favicon": "./assets/images/appIcon.png"
+    },
+    "splash": {
+      "image": "./assets/images/splashScreenIcon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#3C4044"
     },
     "plugins": [
       "expo-router",

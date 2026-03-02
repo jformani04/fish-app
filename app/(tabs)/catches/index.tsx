@@ -5,12 +5,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
 import {
   ArrowLeft,
-  Calendar,
-  Fish as FishIcon,
-  MapPin,
   RefreshCcw,
-  Ruler,
-  Weight,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
@@ -25,6 +20,11 @@ import {
 } from "react-native";
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
+const VIEW_CATCHES_ICON = require("@/assets/images/viewCatches.png");
+const RULER_ICON = require("@/assets/images/ruler.png");
+const PINPOINT_ICON = require("@/assets/images/pinpoint.png");
+const CALENDAR_ICON = require("@/assets/images/calendar.png");
+const WEIGHT_ICON = require("@/assets/images/weight.png");
 
 export default function CatchesScreen() {
   const isFocused = useIsFocused();
@@ -143,7 +143,7 @@ export default function CatchesScreen() {
       ) : catches.length === 0 ? (
         <View style={styles.centerCard}>
           <View style={styles.emptyIconWrap}>
-            <FishIcon color={COLORS.primary} size={34} strokeWidth={2} />
+            <Image source={VIEW_CATCHES_ICON} style={styles.emptyIconImage} />
           </View>
           <Text style={styles.emptyTitle}>No catches yet</Text>
           <Text style={styles.centerSubtext}>
@@ -164,7 +164,7 @@ export default function CatchesScreen() {
                     <Image source={{ uri: catchLog.imageUrl }} style={styles.thumbImage} />
                   ) : (
                     <View style={[styles.thumbImage, styles.imageFallback]}>
-                      <FishIcon color={COLORS.primary} size={24} strokeWidth={2} />
+                      <Image source={VIEW_CATCHES_ICON} style={styles.fallbackThumbIcon} />
                     </View>
                   )}
                 </View>
@@ -197,23 +197,23 @@ export default function CatchesScreen() {
 
                   <View style={styles.lengthWeightRow}>
                     <View style={styles.inlineRow}>
-                      <Ruler color={COLORS.primary} size={12} strokeWidth={2} />
+                      <Image source={RULER_ICON} style={styles.metaIcon} />
                       <Text style={styles.metaText}>{catchLog.length || "-"}</Text>
                     </View>
                     <Text style={styles.dot}>•</Text>
                     <View style={styles.inlineRow}>
-                      <Weight color={COLORS.primary} size={12} strokeWidth={2} />
+                      <Image source={WEIGHT_ICON} style={styles.metaIcon} />
                       <Text style={styles.metaText}>{catchLog.weight || "-"}</Text>
                     </View>
                   </View>
 
                   <View style={styles.locationDateRow}>
-                    <MapPin color={COLORS.primary} size={12} strokeWidth={2} />
+                    <Image source={PINPOINT_ICON} style={styles.metaIconLarge} />
                     <Text style={styles.locationText} numberOfLines={1}>
                       {catchLog.location || "Unknown location"}
                     </Text>
                     <Text style={styles.dot}>•</Text>
-                    <Calendar color={COLORS.primary} size={12} strokeWidth={2} />
+                    <Image source={CALENDAR_ICON} style={styles.metaIconLarge} />
                     <Text style={styles.dateText} numberOfLines={1}>
                       {catchLog.date || "No date"}
                     </Text>
@@ -346,12 +346,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   emptyIconWrap: {
-    width: 68,
-    height: 68,
+    width: 84,
+    height: 84,
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(253,123,65,0.15)",
+    backgroundColor: "transparent",
+  },
+  emptyIconImage: {
+    width: 84,
+    height: 84,
+    resizeMode: "contain",
   },
   emptyTitle: {
     color: COLORS.text,
@@ -372,11 +377,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   thumbWrap: {
-    width: 80,
-    height: 80,
+    width: 68,
+    height: 68,
     borderRadius: 12,
     overflow: "hidden",
   },
@@ -389,6 +395,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.35)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  fallbackThumbIcon: {
+    width: 34,
+    height: 34,
+    resizeMode: "contain",
   },
   cardContent: {
     flex: 1,
@@ -434,6 +445,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
+  },
+  metaIcon: {
+    width: 22,
+    height: 22,
+    resizeMode: "contain",
+  },
+  metaIconLarge: {
+    width: 26,
+    height: 26,
+    resizeMode: "contain",
   },
   lengthWeightRow: {
     marginTop: 4,
