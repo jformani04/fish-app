@@ -28,6 +28,7 @@ export default function TabsLayout() {
       <Stack.Screen name="catches/[catchId]" />
       <Stack.Screen name="favorites/index" />
       <Stack.Screen name="profile/index" />
+      <Stack.Screen name="map" />
     </Stack>
   );
 }

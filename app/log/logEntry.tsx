@@ -1,13 +1,11 @@
 import { COLORS } from "@/lib/colors";
-import { createCatchLog } from "@/lib/catches";
+import { createCatchLog, uploadCatchPhoto } from "@/lib/catches";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
 import {
   ArrowLeft,
-  Check,
   Cloud,
   Droplets,
-  Fish as FishIcon,
   MapPin,
 } from "lucide-react-native";
 import { useState } from "react";
@@ -60,10 +58,10 @@ export default function LogEntry() {
 
   const isCompact = width < 400;
 
-  const [selectedSpecies, setSelectedSpecies] = useState("");
   const [isPublic, setIsPublic] = useState(true);
   const [hideLocation, setHideLocation] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [catchCoords, setCatchCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [formData, setFormData] = useState({
     species: "",
     length: "",
@@ -79,9 +77,9 @@ export default function LogEntry() {
 
   useEffect(() => {
     // Always start a fresh log when a new scan/photo opens this route.
-    setSelectedSpecies("");
     setIsPublic(true);
     setHideLocation(false);
+    setCatchCoords(null);
     setFormData({
       species: "",
       length: "",
@@ -107,6 +105,8 @@ export default function LogEntry() {
         });
         if (cancelled) return;
 
+        setCatchCoords({ latitude: current.coords.latitude, longitude: current.coords.longitude });
+
         const geocoded = await Location.reverseGeocodeAsync(current.coords);
         if (cancelled || !geocoded.length) return;
 
@@ -126,30 +126,26 @@ export default function LogEntry() {
     };
   }, [imageUri, draftId]);
 
-  const speciesPredictions = [
-    { name: "Largemouth Bass", confidence: 92 },
-    { name: "Smallmouth Bass", confidence: 78 },
-    { name: "Spotted Bass", confidence: 64 },
-  ];
-
-  const handleSpeciesSelect = (speciesName: string) => {
-    setSelectedSpecies(speciesName);
-    setFormData((prev) => ({ ...prev, species: speciesName }));
-  };
-
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
-    if (field === "species") {
-      setSelectedSpecies(value);
-    }
   };
 
   const handleSubmit = async () => {
     try {
       setSaving(true);
 
+      let imageUrl = "";
+      if (imageUri) {
+        imageUrl = await uploadCatchPhoto(imageUri);
+      }
+
+      const parsedDate = new Date(formData.date);
+      const isoDate = isNaN(parsedDate.getTime())
+        ? new Date().toISOString()
+        : parsedDate.toISOString();
+
       await createCatchLog({
-        imageUrl: imageUri ?? "",
+        imageUrl,
         species: formData.species,
         length: formData.length,
         weight: formData.weight,
@@ -162,7 +158,9 @@ export default function LogEntry() {
         isPublic,
         isFavorite: false,
         hideLocation,
-        date: formData.date,
+        date: isoDate,
+        latitude: catchCoords?.latitude ?? null,
+        longitude: catchCoords?.longitude ?? null,
       });
 
       Alert.alert("Catch Logged", "Your catch was saved.", [
@@ -214,43 +212,11 @@ export default function LogEntry() {
         </View>
 
         <View style={styles.content}>
-          {/* Species Prediction */}
+          {/* Species */}
           <View style={styles.bubble}>
-            <Text style={styles.sectionHeader}>Species Guess</Text>
-
-            {speciesPredictions.map((prediction) => (
-              <TouchableOpacity
-                key={prediction.name}
-                onPress={() => handleSpeciesSelect(prediction.name)}
-                style={[
-                  styles.predictionButton,
-                  selectedSpecies === prediction.name &&
-                    styles.predictionSelected,
-                ]}
-              >
-                <View style={styles.predictionLeft}>
-                  <View style={styles.predictionIcon}>
-                    <FishIcon
-                      color={COLORS.primary}
-                      strokeWidth={2}
-                      size={20}
-                    />
-                  </View>
-                  <Text style={styles.predictionText}>{prediction.name}</Text>
-                </View>
-                <View style={styles.predictionRight}>
-                  <Text style={styles.predictionConfidence}>
-                    {prediction.confidence}%
-                  </Text>
-                  {selectedSpecies === prediction.name && (
-                    <Check color={COLORS.primary} strokeWidth={2} size={20} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-
+            <Text style={styles.sectionHeader}>Species</Text>
             <TextInput
-              placeholder="Or enter species manually..."
+              placeholder="Enter species..."
               placeholderTextColor={COLORS.textSecondary}
               value={formData.species}
               onChangeText={(text) => handleInputChange("species", text)}

@@ -18,7 +18,18 @@ export interface CatchLog {
   isFavorite: boolean;
   hideLocation: boolean;
   date: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
+
+export type MapCatchPin = {
+  id: string;
+  species: string;
+  latitude: number;
+  longitude: number;
+  imageUrl: string;
+  date: string;
+};
 
 type CatchLogRow = {
   id: string;
@@ -38,6 +49,8 @@ type CatchLogRow = {
   hide_location: boolean | null;
   date: string | null;
   created_at: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type CatchLogUpdateRow = {
@@ -55,6 +68,8 @@ type CatchLogUpdateRow = {
   is_favorite: boolean;
   hide_location: boolean;
   date: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type CatchLogInsertInput = Omit<CatchLog, "id">;
@@ -98,6 +113,8 @@ export function mapCatchLogRowToCatchLog(row: CatchLogRow): CatchLog {
     isFavorite: row.is_favorite ?? false,
     hideLocation: row.hide_location ?? false,
     date: row.date ?? "",
+    latitude: row.latitude ?? null,
+    longitude: row.longitude ?? null,
   };
 }
 
@@ -117,6 +134,8 @@ export function mapCatchLogToUpdateRow(catchLog: CatchLog): CatchLogUpdateRow {
     is_favorite: catchLog.isFavorite,
     hide_location: catchLog.hideLocation,
     date: catchLog.date,
+    latitude: catchLog.latitude ?? null,
+    longitude: catchLog.longitude ?? null,
   };
 }
 
@@ -198,9 +217,16 @@ export async function updateCatchLog(catchLog: CatchLog): Promise<void> {
   if (
     error &&
     (isMissingColumnError(error, "hide_location") ||
-      isMissingColumnError(error, "is_favorite"))
+      isMissingColumnError(error, "is_favorite") ||
+      isMissingColumnError(error, "latitude") ||
+      isMissingColumnError(error, "longitude"))
   ) {
-    const legacyPayload = stripOptionalColumns(payload, ["hide_location", "is_favorite"]);
+    const legacyPayload = stripOptionalColumns(payload, [
+      "hide_location",
+      "is_favorite",
+      "latitude",
+      "longitude",
+    ]);
     const retry = await supabase
       .from("catch_logs")
       .update(legacyPayload)
@@ -244,15 +270,24 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<void> 
     is_favorite: input.isFavorite,
     hide_location: input.hideLocation,
     date: input.date,
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
   };
 
   let { error } = await supabase.from("catch_logs").insert(payload);
   if (
     error &&
     (isMissingColumnError(error, "hide_location") ||
-      isMissingColumnError(error, "is_favorite"))
+      isMissingColumnError(error, "is_favorite") ||
+      isMissingColumnError(error, "latitude") ||
+      isMissingColumnError(error, "longitude"))
   ) {
-    const legacyPayload = stripOptionalColumns(payload, ["hide_location", "is_favorite"]);
+    const legacyPayload = stripOptionalColumns(payload, [
+      "hide_location",
+      "is_favorite",
+      "latitude",
+      "longitude",
+    ]);
     const retry = await supabase.from("catch_logs").insert(legacyPayload);
     error = retry.error;
   }
@@ -262,6 +297,66 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<void> 
   }
 
   debugLog("create success");
+}
+
+export async function getMapCatchPins(userId: string): Promise<MapCatchPin[]> {
+  debugLog("fetch map pins user_id", userId);
+
+  const { data, error } = await supabase
+    .from("catch_logs")
+    .select("id, species, latitude, longitude, image_url, date")
+    .eq("user_id", userId)
+    .not("latitude", "is", null)
+    .not("longitude", "is", null);
+
+  if (error) {
+    debugLog("fetch map pins failed", error);
+    throw error;
+  }
+
+  return ((data ?? []) as any[]).filter(
+    (row) =>
+      typeof row.latitude === "number" &&
+      typeof row.longitude === "number" &&
+      isFinite(row.latitude) &&
+      isFinite(row.longitude)
+  ).map((row) => ({
+    id: row.id as string,
+    species: (row.species as string | null) ?? "Unknown",
+    latitude: row.latitude as number,
+    longitude: row.longitude as number,
+    imageUrl: (row.image_url as string | null) ?? "",
+    date: (row.date as string | null) ?? "",
+  }));
+}
+
+export async function uploadCatchPhoto(fileUri: string): Promise<string> {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError) throw userError;
+  if (!user) throw new Error("No authenticated user");
+
+  const filePath = `${user.id}/${Date.now()}.jpg`;
+  const fileBlob = await (await fetch(fileUri)).blob();
+
+  const { error: uploadError } = await supabase.storage
+    .from("catch_photos")
+    .upload(filePath, fileBlob, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    debugLog("catch photo upload failed", uploadError);
+    throw uploadError;
+  }
+
+  const { data } = supabase.storage.from("catch_photos").getPublicUrl(filePath);
+  debugLog("catch photo upload success", data.publicUrl);
+  return data.publicUrl;
 }
 
 export async function deleteCatchLog(catchId: string): Promise<void> {
@@ -290,13 +385,6 @@ export async function deleteCatchLog(catchId: string): Promise<void> {
 }
 
 export async function seedDevCatchLog(userId: string): Promise<void> {
-  const now = new Date();
-  const date = now.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-
   const payload = {
     user_id: userId,
     image_url: "",
@@ -312,7 +400,7 @@ export async function seedDevCatchLog(userId: string): Promise<void> {
     is_public: true,
     is_favorite: false,
     hide_location: false,
-    date,
+    date: new Date().toISOString(),
   };
 
   let { error } = await supabase.from("catch_logs").insert(payload);

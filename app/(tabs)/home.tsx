@@ -9,6 +9,7 @@ import {
   Calendar,
   Fish,
   LogOut,
+  Map,
   MapPin,
   Ruler,
   User,
@@ -161,6 +162,19 @@ export default function Home() {
         <View style={styles.fullBubbleContentCentered}>
           <Text style={[styles.actionText, styles.actionTextCentered]}>Species Guide</Text>
           <Text style={[styles.actionSubtext, styles.actionTextCentered]}>Browse and learn</Text>
+        </View>
+      </Pressable>
+
+      <Pressable
+        style={[styles.fullBubble, styles.fullBubbleCentered]}
+        onPress={() => router.push("/map")}
+      >
+        <View style={[styles.actionIconCentered, { height: 60 }]}>
+          <Map size={48} color={COLORS.primary} strokeWidth={1.5} />
+        </View>
+        <View style={styles.fullBubbleContentCentered}>
+          <Text style={[styles.actionText, styles.actionTextCentered]}>Catch Map</Text>
+          <Text style={[styles.actionSubtext, styles.actionTextCentered]}>View catches on a map</Text>
         </View>
       </Pressable>
 

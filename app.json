@@ -1,14 +1,18 @@
 {
   "expo": {
-    "name": "fish-app",
-    "slug": "fish-app",
+    "name": "Anglr",
+    "slug": "anglr",
     "version": "1.0.0",
     "icon": "./assets/images/appIcon.png",
     "orientation": "portrait",
-    "scheme": "fishapp",
+    "scheme": "anglr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/images/appIcon.png"
@@ -16,11 +20,22 @@
     "android": {
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.fishr",
+      "package": "com.anglr",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/appIcon.png",
         "backgroundColor": "#3C4044"
-      }
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyCdsxNaAwVRc3NKKptYKAODzfuew2AvuU8"
+        }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -55,6 +70,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "37fc6544-015c-4196-b898-520e2971335e"
+      }
+    },
+    "owner": "jformani"
   }
 }

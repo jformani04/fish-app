@@ -4,6 +4,7 @@ import {
   deleteCatchLog,
   getCatchLogById,
   updateCatchLog,
+  uploadCatchPhoto,
 } from "@/lib/catches";
 import { supabase } from "@/lib/supabase";
 import { getProfile, LengthUnit, TempUnit, WeightUnit } from "@/lib/profile";
@@ -167,6 +168,17 @@ function splitDateTime(raw: string): { datePart: string; timePart: string } {
     return { datePart: formatCurrentDate(), timePart: formatCurrentTime() };
   }
 
+  // Handle ISO 8601 dates stored in the database
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return {
+        datePart: d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        timePart: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }).toUpperCase(),
+      };
+    }
+  }
+
   const match = trimmed.match(/^(.*?)(?:\s+at\s+|\s+)(\d{1,2}:\d{2}\s?(?:AM|PM))$/i);
   if (!match) {
     return { datePart: trimmed, timePart: formatCurrentTime() };
@@ -176,6 +188,11 @@ function splitDateTime(raw: string): { datePart: string; timePart: string } {
     datePart: match[1].trim() || formatCurrentDate(),
     timePart: match[2].trim().toUpperCase(),
   };
+}
+
+function toIsoDate(displayDate: string): string {
+  const d = new Date(displayDate);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
 function joinDateTime(datePart: string, timePart: string) {
@@ -320,15 +337,16 @@ export default function EditCatchScreen() {
       setError(null);
 
       const payload = buildSavePayload(form, lengthUnit, weightUnit, temperatureUnit);
+      const isoDate = toIsoDate(joinDateTime(payload.date, timeValue));
       await updateCatchLog({
         id: catchId,
         ...payload,
-        date: joinDateTime(payload.date, timeValue),
+        date: isoDate,
       });
 
       lastSavedSnapshot.current = JSON.stringify({
         ...payload,
-        date: joinDateTime(payload.date, timeValue),
+        date: isoDate,
         lengthUnit,
         weightUnit,
         temperatureUnit,
@@ -350,7 +368,7 @@ export default function EditCatchScreen() {
     const payload = buildSavePayload(form, lengthUnit, weightUnit, temperatureUnit);
     const snapshot = JSON.stringify({
       ...payload,
-      date: joinDateTime(payload.date, timeValue),
+      date: toIsoDate(joinDateTime(payload.date, timeValue)),
       lengthUnit,
       weightUnit,
       temperatureUnit,
@@ -405,7 +423,8 @@ export default function EditCatchScreen() {
       if (result.canceled || !result.assets?.[0]?.uri) return;
 
       setUploadingImage(true);
-      setField("imageUrl", result.assets[0].uri);
+      const publicUrl = await uploadCatchPhoto(result.assets[0].uri);
+      setField("imageUrl", publicUrl);
     } catch (err: any) {
       Alert.alert("Image Error", err?.message ?? "Unable to select image.");
     } finally {
