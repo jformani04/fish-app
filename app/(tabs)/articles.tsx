@@ -41,7 +41,7 @@ export default function ArticlesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.backButton}>
           <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
         </Pressable>
         <View style={styles.headerTextWrap}>

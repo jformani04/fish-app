@@ -1,16 +1,19 @@
 import { COLORS } from "@/lib/colors";
 import {
   CatchLog,
+  createCatchLog,
   deleteCatchLog,
   getCatchLogById,
   updateCatchLog,
   uploadCatchPhoto,
 } from "@/lib/catches";
+import * as Location from "expo-location";
 import { supabase } from "@/lib/supabase";
 import { getProfile, LengthUnit, TempUnit, WeightUnit } from "@/lib/profile";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { ArrowLeft, Camera, ChevronDown } from "lucide-react-native";
+import LocationPickerModal, { LocationResult } from "@/components/LocationPickerModal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -218,7 +221,8 @@ function buildSavePayload(
 }
 
 export default function EditCatchScreen() {
-  const { catchId } = useLocalSearchParams<{ catchId: string }>();
+  const { catchId, imageUri: initialImageUri } = useLocalSearchParams<{ catchId: string; imageUri?: string }>();
+  const isNew = catchId === "new";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -243,14 +247,62 @@ export default function EditCatchScreen() {
   const [methodQuery, setMethodQuery] = useState("");
   const [showMethodMatches, setShowMethodMatches] = useState(false);
   const [timeValue, setTimeValue] = useState(formatCurrentTime());
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerCoords, setPickerCoords] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const hasLoadedInitialData = useRef(false);
   const lastSavedSnapshot = useRef<string>("");
+  // Local file URI waiting to be uploaded when saving a new catch
+  const [pendingLocalUri, setPendingLocalUri] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setError(null);
+
+        if (isNew) {
+          // ── Create mode: no DB load, init from prefs + optional imageUri ──
+          try {
+            const profile = await getProfile();
+            setLengthUnit(profile.unitsLength);
+            setWeightUnit(profile.unitsWeight);
+            setTemperatureUnit(toTemperatureUnit(profile.unitsTemp));
+          } catch {
+            // use defaults
+          }
+          const now = new Date();
+          setForm((prev) => ({
+            ...prev,
+            imageUrl: initialImageUri ?? "",
+            date: now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+          }));
+          setTimeValue(now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
+          if (initialImageUri) setPendingLocalUri(initialImageUri);
+
+          // GPS prefill (best-effort)
+          try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === "granted") {
+              const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+              setPickerCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+              const geo = await Location.reverseGeocodeAsync(loc.coords);
+              if (geo.length) {
+                const city = geo[0].city || geo[0].subregion || geo[0].region || "";
+                const area = geo[0].region || geo[0].country || "";
+                const label = [city, area].filter(Boolean).join(", ");
+                if (label) setForm((prev) => (prev.location ? prev : { ...prev, location: label }));
+              }
+            }
+          } catch {
+            // non-critical
+          }
+
+          hasLoadedInitialData.current = true;
+          return;
+        }
 
         const {
           data: { user },
@@ -307,11 +359,21 @@ export default function EditCatchScreen() {
         setWeatherQuery(hydratedForm.weather);
         setLureQuery(hydratedForm.lure);
         setMethodQuery(hydratedForm.method);
+
+        const initPickerCoords =
+          typeof catchLog.latitude === "number" &&
+          typeof catchLog.longitude === "number"
+            ? { latitude: catchLog.latitude, longitude: catchLog.longitude }
+            : null;
+        setPickerCoords(initPickerCoords);
+
         lastSavedSnapshot.current = JSON.stringify({
           ...hydratedForm,
           lengthUnit: parsedLength.unit,
           weightUnit: parsedWeight.unit,
           temperatureUnit: parsedTemperature.unit,
+          _pickerLat: initPickerCoords?.latitude ?? null,
+          _pickerLng: initPickerCoords?.longitude ?? null,
         });
         hasLoadedInitialData.current = true;
       } catch (err: any) {
@@ -342,6 +404,8 @@ export default function EditCatchScreen() {
         id: catchId,
         ...payload,
         date: isoDate,
+        latitude: pickerCoords?.latitude ?? null,
+        longitude: pickerCoords?.longitude ?? null,
       });
 
       lastSavedSnapshot.current = JSON.stringify({
@@ -351,6 +415,8 @@ export default function EditCatchScreen() {
         weightUnit,
         temperatureUnit,
         timeValue,
+        _pickerLat: pickerCoords?.latitude ?? null,
+        _pickerLng: pickerCoords?.longitude ?? null,
       });
       setSaveStatus("saved");
     } catch (err: any) {
@@ -359,9 +425,48 @@ export default function EditCatchScreen() {
     } finally {
       setSaving(false);
     }
-  }, [catchId, form, lengthUnit, weightUnit, temperatureUnit, timeValue]);
+  }, [catchId, form, lengthUnit, weightUnit, temperatureUnit, timeValue, pickerCoords]);
+
+  const handleCreate = useCallback(async () => {
+    try {
+      setSaving(true);
+      setSaveStatus("saving");
+      setError(null);
+
+      let imageUrl = form.imageUrl;
+      if (pendingLocalUri) {
+        imageUrl = await uploadCatchPhoto(pendingLocalUri);
+      }
+
+      const payload = buildSavePayload(
+        { ...form, imageUrl },
+        lengthUnit,
+        weightUnit,
+        temperatureUnit
+      );
+      const isoDate = toIsoDate(joinDateTime(payload.date, timeValue));
+
+      await createCatchLog({
+        ...payload,
+        date: isoDate,
+        latitude: pickerCoords?.latitude ?? null,
+        longitude: pickerCoords?.longitude ?? null,
+      });
+
+      Alert.alert("Catch Logged!", "Your catch has been saved.", [
+        { text: "View Catches", onPress: () => router.replace("/catches") },
+      ]);
+    } catch (err: any) {
+      setSaveStatus("error");
+      setError(err?.message ?? "Unable to save catch.");
+      Alert.alert("Save Failed", err?.message ?? "Unable to save catch.");
+    } finally {
+      setSaving(false);
+    }
+  }, [form, lengthUnit, weightUnit, temperatureUnit, timeValue, pickerCoords, pendingLocalUri]);
 
   useEffect(() => {
+    if (isNew) return;
     if (!catchId || loading || !hasLoadedInitialData.current) return;
     if (deleting) return;
 
@@ -373,6 +478,8 @@ export default function EditCatchScreen() {
       weightUnit,
       temperatureUnit,
       timeValue,
+      _pickerLat: pickerCoords?.latitude ?? null,
+      _pickerLng: pickerCoords?.longitude ?? null,
     });
     if (snapshot === lastSavedSnapshot.current) return;
 
@@ -381,7 +488,7 @@ export default function EditCatchScreen() {
     }, 700);
 
     return () => clearTimeout(timer);
-  }, [form, lengthUnit, weightUnit, temperatureUnit, timeValue, catchId, loading, deleting, handleSave]);
+  }, [form, lengthUnit, weightUnit, temperatureUnit, timeValue, pickerCoords, catchId, loading, deleting, handleSave]);
 
   const confirmDelete = () => {
     Alert.alert("Delete Catch", "This will permanently delete this catch log.", [
@@ -425,6 +532,7 @@ export default function EditCatchScreen() {
       setUploadingImage(true);
       const publicUrl = await uploadCatchPhoto(result.assets[0].uri);
       setField("imageUrl", publicUrl);
+      setPendingLocalUri(null);
     } catch (err: any) {
       Alert.alert("Image Error", err?.message ?? "Unable to select image.");
     } finally {
@@ -462,6 +570,7 @@ export default function EditCatchScreen() {
   }
 
   return (
+    <>
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -477,8 +586,8 @@ export default function EditCatchScreen() {
             <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
           </Pressable>
           <View style={styles.headerTextWrap}>
-            <Text style={styles.title}>Edit Catch</Text>
-            <Text style={styles.subtitle}>Update your log entry</Text>
+            <Text style={styles.title}>{isNew ? "New Catch" : "Edit Catch"}</Text>
+            <Text style={styles.subtitle}>{isNew ? "Log your catch details" : "Update your log entry"}</Text>
           </View>
         </View>
 
@@ -494,19 +603,21 @@ export default function EditCatchScreen() {
         <View style={styles.card}>
           <View style={styles.cardTopRow}>
             <Text style={styles.cardTitle}>Catch Details</Text>
-            <View style={styles.statusPill}>
-              <Text style={styles.statusPillText}>
-                {deleting
-                  ? "Deleting..."
-                  : saveStatus === "saving"
-                    ? "Saving..."
-                    : saveStatus === "saved"
-                      ? "Saved"
-                      : saveStatus === "error"
-                        ? "Save Error"
-                        : "Auto Save"}
-              </Text>
-            </View>
+            {!isNew && (
+              <View style={styles.statusPill}>
+                <Text style={styles.statusPillText}>
+                  {deleting
+                    ? "Deleting..."
+                    : saveStatus === "saving"
+                      ? "Saving..."
+                      : saveStatus === "saved"
+                        ? "Saved"
+                        : saveStatus === "error"
+                          ? "Save Error"
+                          : "Auto Save"}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.sectionBubble}>
@@ -659,21 +770,48 @@ export default function EditCatchScreen() {
 
           <View style={styles.sectionBubble}>
           <Text style={styles.groupTitle}>Location & Date</Text>
-          <View style={[styles.row, styles.locationTimeRow]}>
-            <View style={styles.locationTimeItem}>
-              <Text style={[styles.sectionLabel, styles.centeredFieldLabel]}>Location</Text>
+
+          {/* Location picker */}
+          <Text style={styles.sectionLabel}>Location</Text>
+          <Pressable
+            style={styles.locationPickerButton}
+            onPress={() => setShowPicker(true)}
+          >
+            {pickerCoords ? (
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationPickerName} numberOfLines={1}>
+                  {form.location || "Location selected"}
+                </Text>
+                <Text style={styles.locationPickerCoords}>
+                  {pickerCoords.latitude.toFixed(5)}, {pickerCoords.longitude.toFixed(5)}
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.locationPickerPlaceholder}>
+                {form.location || "Tap to pick on map…"}
+              </Text>
+            )}
+            <Text style={styles.locationPickerAction}>
+              {pickerCoords ? "Change" : "Pick on Map"}
+            </Text>
+          </Pressable>
+
+          {/* Date + Time row */}
+          <View style={styles.row}>
+            <View style={styles.rowItem}>
+              <Text style={styles.sectionLabel}>Date</Text>
               <TextInput
-                style={[styles.input, styles.centeredFieldInput]}
-                placeholder="Fishing spot"
+                style={styles.input}
+                placeholder="Mar 1, 2026"
                 placeholderTextColor={COLORS.textSecondary}
-                value={form.location}
-                onChangeText={(v) => setField("location", v)}
+                value={form.date}
+                onChangeText={(v) => setField("date", v)}
               />
             </View>
-            <View style={styles.locationTimeItem}>
-              <Text style={[styles.sectionLabel, styles.centeredFieldLabel]}>Time</Text>
+            <View style={[styles.rowItem, styles.timeItem]}>
+              <Text style={styles.sectionLabel}>Time</Text>
               <TextInput
-                style={[styles.input, styles.centeredFieldInput]}
+                style={styles.input}
                 placeholder="8:30 PM"
                 placeholderTextColor={COLORS.textSecondary}
                 value={timeValue}
@@ -681,15 +819,6 @@ export default function EditCatchScreen() {
               />
             </View>
           </View>
-
-          <Text style={styles.sectionLabel}>Date</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Mar 1, 2026"
-            placeholderTextColor={COLORS.textSecondary}
-            value={form.date}
-            onChangeText={(v) => setField("date", v)}
-          />
 
           </View>
 
@@ -933,30 +1062,57 @@ export default function EditCatchScreen() {
 
           {!!error && <Text style={styles.inlineError}>{error}</Text>}
 
-          <Text style={styles.saveStatusText}>
-            {deleting
-              ? "Deleting..."
-              : saveStatus === "saving"
-                ? "Saving changes..."
-                : saveStatus === "saved"
-                  ? "All changes saved"
-                  : saveStatus === "error"
-                    ? "Autosave failed"
-                    : "Changes save automatically"}
-          </Text>
+          {isNew ? (
+            <Pressable
+              style={[styles.logCatchButton, saving && styles.logCatchButtonDisabled]}
+              onPress={handleCreate}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color={COLORS.text} size="small" />
+              ) : (
+                <Text style={styles.logCatchButtonText}>Log Catch</Text>
+              )}
+            </Pressable>
+          ) : (
+            <>
+              <Text style={styles.saveStatusText}>
+                {deleting
+                  ? "Deleting..."
+                  : saveStatus === "saving"
+                    ? "Saving changes..."
+                    : saveStatus === "saved"
+                      ? "All changes saved"
+                      : saveStatus === "error"
+                        ? "Autosave failed"
+                        : "Changes save automatically"}
+              </Text>
 
-          <Pressable
-            style={[styles.deleteButton, deleting && { opacity: 0.7 }]}
-            onPress={confirmDelete}
-            disabled={deleting || saving}
-          >
-            <Text style={styles.deleteButtonText}>
-              {deleting ? "Deleting..." : "Delete Catch"}
-            </Text>
-          </Pressable>
+              <Pressable
+                style={[styles.deleteButton, deleting && { opacity: 0.7 }]}
+                onPress={confirmDelete}
+                disabled={deleting || saving}
+              >
+                <Text style={styles.deleteButtonText}>
+                  {deleting ? "Deleting..." : "Delete Catch"}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
+    <LocationPickerModal
+      visible={showPicker}
+      initialCoords={pickerCoords}
+      onConfirm={(result: LocationResult) => {
+        setPickerCoords({ latitude: result.latitude, longitude: result.longitude });
+        setField("location", result.locationName);
+        setShowPicker(false);
+      }}
+      onClose={() => setShowPicker(false)}
+    />
+    </>
   );
 }
 
@@ -1210,6 +1366,39 @@ const styles = StyleSheet.create({
   centeredFieldInput: {
     textAlign: "center",
   },
+  locationPickerButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(253,123,65,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(253,123,65,0.3)",
+    marginBottom: 8,
+    gap: 8,
+  },
+  locationPickerName: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  locationPickerCoords: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  locationPickerPlaceholder: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    flex: 1,
+  },
+  locationPickerAction: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: "700",
+    flexShrink: 0,
+  },
   toggleRow: {
     marginTop: 14,
     marginBottom: 8,
@@ -1256,6 +1445,26 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 15,
     fontWeight: "700",
+  },
+  logCatchButton: {
+    marginTop: 10,
+    backgroundColor: COLORS.primary,
+    borderRadius: 999,
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+    minHeight: 52,
+  },
+  logCatchButtonDisabled: {
+    opacity: 0.65,
+  },
+  logCatchButtonText: {
+    color: COLORS.text,
+    fontWeight: "700",
+    fontSize: 16,
+    letterSpacing: 0.5,
   },
   deleteButton: {
     marginTop: 10,

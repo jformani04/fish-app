@@ -137,7 +137,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 export async function linkGoogleIdentity(): Promise<void> {
   const redirectUri = AuthSession.makeRedirectUri({
-    scheme: "fishapp",
+    scheme: "anglr",
     path: "auth/callback",
   });
 
@@ -194,7 +194,7 @@ export async function linkGoogleIdentity(): Promise<void> {
 
 export async function enableEmailLogin(email: string): Promise<void> {
   const redirectTo = AuthSession.makeRedirectUri({
-    scheme: "fishapp",
+    scheme: "anglr",
     path: "auth/callback",
   });
 

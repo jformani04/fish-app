@@ -15,7 +15,8 @@ import {
   Text,
   View,
 } from "react-native";
-import MapView, { Callout, Marker, Region } from "react-native-maps";
+import ClusterMapView from "react-native-map-clustering";
+import { Callout, Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const DEFAULT_REGION: Region = {
@@ -40,28 +41,34 @@ function formatDisplayDate(raw: string): string {
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [pins, setPins] = useState<MapCatchPin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [initialRegion, setInitialRegion] = useState<Region>(DEFAULT_REGION);
 
-  // Request user location once — used only to set the initial map region
+  // Request user location once — animate to it after map is ready
   useEffect(() => {
     const getLocation = async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        if (status !== "granted") {
+          console.log("[map] location permission denied — using default region");
+          return;
+        }
         const loc = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
-        setInitialRegion({
-          latitude: loc.coords.latitude,
-          longitude: loc.coords.longitude,
-          latitudeDelta: 3,
-          longitudeDelta: 3,
-        });
-      } catch {
-        // non-critical — falls back to DEFAULT_REGION
+        mapRef.current?.animateToRegion(
+          {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+            latitudeDelta: 3,
+            longitudeDelta: 3,
+          },
+          600
+        );
+      } catch (e) {
+        console.log("[map] location error:", e);
+        // non-critical — stays on DEFAULT_REGION
       }
     };
     getLocation();
@@ -104,13 +111,19 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <MapView
+      <ClusterMapView
         ref={mapRef}
         style={styles.map}
-        initialRegion={initialRegion}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={DEFAULT_REGION}
         showsUserLocation
         showsMyLocationButton={false}
         showsCompass={false}
+        clusterColor={COLORS.primary}
+        clusterTextColor="#fff"
+        clusterFontFamily={undefined}
+        onMapReady={() => console.log("[map] Google Maps ready")}
+        onError={(e: any) => console.log("[map] MapView error:", e)}
       >
         {pins.map((pin) => (
           <Marker
@@ -138,14 +151,14 @@ export default function MapScreen() {
             </Callout>
           </Marker>
         ))}
-      </MapView>
+      </ClusterMapView>
 
       {/* Floating header */}
       <View
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === "android" ? 8 : 4) }]}
         pointerEvents="box-none"
       >
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.backButton}>
           <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
         </Pressable>
 
