@@ -1,164 +1,152 @@
 import { COLORS } from "@/lib/colors";
-import { MapCatchPin, getMapCatchPins } from "@/lib/catches";
+import { CatchLog, getUserCatchLogs } from "@/lib/catches";
 import { supabase } from "@/lib/supabase";
 import { useIsFocused } from "@react-navigation/native";
-import * as Location from "expo-location";
 import { router } from "expo-router";
 import { ArrowLeft, MapPin } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import ClusterMapView from "react-native-map-clustering";
-import { Callout, Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const DEFAULT_REGION: Region = {
-  // Continental US center
-  latitude: 39.5,
-  longitude: -98.35,
-  latitudeDelta: 45,
-  longitudeDelta: 55,
+const DEFAULT_REGION = {
+  latitude: 41.238,
+  longitude: -81.841,
+  latitudeDelta: 0.3,
+  longitudeDelta: 0.3,
 };
 
-function formatDisplayDate(raw: string): string {
-  if (!raw) return "";
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return raw;
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+function hasValidCoordinates(catchLog: CatchLog) {
+  const latitude = Number(catchLog.latitude);
+  const longitude = Number(catchLog.longitude);
+
+  return Number.isFinite(latitude) && Number.isFinite(longitude);
 }
 
-export default function MapScreen() {
+export default function CatchMapScreen() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const mapRef = useRef<any>(null);
-  const [pins, setPins] = useState<MapCatchPin[]>([]);
+  const mapRef = useRef<MapView>(null);
+  const [catches, setCatches] = useState<CatchLog[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Request user location once — animate to it after map is ready
-  useEffect(() => {
-    const getLocation = async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") {
-          console.log("[map] location permission denied — using default region");
-          return;
-        }
-        const loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        mapRef.current?.animateToRegion(
-          {
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            latitudeDelta: 3,
-            longitudeDelta: 3,
-          },
-          600
-        );
-      } catch (e) {
-        console.log("[map] location error:", e);
-        // non-critical — stays on DEFAULT_REGION
-      }
-    };
-    getLocation();
-  }, []);
-
-  // Refetch pins every time the screen comes into focus
   useEffect(() => {
     if (!isFocused) return;
 
-    const fetchPins = async () => {
+    const loadCatches = async () => {
       try {
         setLoading(true);
         const {
           data: { user },
         } = await supabase.auth.getUser();
-        if (!user) return;
-        const data = await getMapCatchPins(user.id);
-        setPins(data);
-      } catch {
-        // map still shows — pins just stay empty
+
+        if (!user) {
+          setCatches([]);
+          return;
+        }
+
+        const rows = await getUserCatchLogs(user.id);
+        setCatches(rows.filter(hasValidCoordinates));
+      } catch (error) {
+        console.log("MAP ERROR", error);
+        setCatches([]);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchPins();
+    loadCatches();
   }, [isFocused]);
 
-  // Once pins load, fit map bounds to show all of them
+  const markerData = useMemo(
+    () =>
+      catches.map((catchLog) => ({
+        ...catchLog,
+        latitude: Number(catchLog.latitude),
+        longitude: Number(catchLog.longitude),
+      })),
+    [catches]
+  );
+
   useEffect(() => {
-    if (!mapRef.current || pins.length === 0) return;
+    if (!mapRef.current || markerData.length === 0) return;
+
     mapRef.current.fitToCoordinates(
-      pins.map((p) => ({ latitude: p.latitude, longitude: p.longitude })),
+      markerData.map((catchLog) => ({
+        latitude: catchLog.latitude,
+        longitude: catchLog.longitude,
+      })),
       {
-        edgePadding: { top: 100, right: 40, bottom: 100, left: 40 },
+        edgePadding: {
+          top: 120,
+          right: 48,
+          bottom: 120,
+          left: 48,
+        },
         animated: true,
       }
     );
-  }, [pins]);
+  }, [markerData]);
+
+  if (loading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.centeredText}>Loading catch map...</Text>
+      </View>
+    );
+  }
+
+  if (markerData.length === 0) {
+    return (
+      <View style={styles.centeredState}>
+        <Text style={styles.centeredText}>No catches yet</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <ClusterMapView
+      <MapView
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
         initialRegion={DEFAULT_REGION}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        clusterColor={COLORS.primary}
-        clusterTextColor="#fff"
-        clusterFontFamily={undefined}
-        onMapReady={() => console.log("[map] Google Maps ready")}
-        onError={(e: any) => console.log("[map] MapView error:", e)}
+        onMapReady={() => console.log("MAP READY")}
+        onError={(e) => console.log("MAP ERROR", e.nativeEvent)}
       >
-        {pins.map((pin) => (
+        {markerData.map((catchLog) => (
           <Marker
-            key={pin.id}
-            coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
-            pinColor={COLORS.primary}
-          >
-            <Callout tooltip style={styles.calloutTooltip}>
-              <View style={styles.callout}>
-                {!!pin.imageUrl && (
-                  <Image
-                    source={{ uri: pin.imageUrl }}
-                    style={styles.calloutImage}
-                    // prevent crash if URL is stale
-                    onError={() => {}}
-                  />
-                )}
-                <Text style={styles.calloutSpecies} numberOfLines={1}>
-                  {pin.species}
-                </Text>
-                <Text style={styles.calloutDate}>
-                  {formatDisplayDate(pin.date)}
-                </Text>
-              </View>
-            </Callout>
-          </Marker>
+            key={catchLog.id}
+            coordinate={{
+              latitude: catchLog.latitude,
+              longitude: catchLog.longitude,
+            }}
+            title={catchLog.species || "Catch"}
+            description={catchLog.weight ? `${catchLog.weight} lbs` : ""}
+            onPress={() => console.log(catchLog.id)}
+          />
         ))}
-      </ClusterMapView>
+      </MapView>
 
-      {/* Floating header */}
       <View
-        style={[styles.header, { paddingTop: insets.top + (Platform.OS === "android" ? 8 : 4) }]}
+        style={[
+          styles.header,
+          { paddingTop: insets.top + (Platform.OS === "android" ? 8 : 4) },
+        ]}
         pointerEvents="box-none"
       >
-        <Pressable onPress={() => router.replace("/(tabs)/home")} style={styles.backButton}>
+        <Pressable
+          onPress={() => router.replace("/(tabs)/home")}
+          style={styles.backButton}
+        >
           <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
         </Pressable>
 
@@ -166,31 +154,11 @@ export default function MapScreen() {
           <Text style={styles.title}>Catch Map</Text>
         </View>
 
-        <View style={styles.pinCountBadge}>
-          <MapPin color={COLORS.primary} size={13} strokeWidth={2.4} />
-          <Text style={styles.pinCountText}>{pins.length}</Text>
+        <View style={styles.countBadge}>
+          <MapPin color={COLORS.primary} size={14} strokeWidth={2.2} />
+          <Text style={styles.countText}>{markerData.length}</Text>
         </View>
       </View>
-
-      {/* Loading spinner */}
-      {loading && (
-        <View style={styles.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator color={COLORS.primary} size="small" />
-        </View>
-      )}
-
-      {/* Empty state — shown over the map when there are no pins */}
-      {!loading && pins.length === 0 && (
-        <View style={[styles.emptyCard, { bottom: insets.bottom + 32 }]} pointerEvents="none">
-          <MapPin color={COLORS.textSecondary} size={22} strokeWidth={1.5} />
-          <View>
-            <Text style={styles.emptyTitle}>No mapped catches yet</Text>
-            <Text style={styles.emptySubtitle}>
-              Allow location when logging a catch to pin it here.
-            </Text>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -201,10 +169,22 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
-
-  /* ── Floating header ─────────────────────────── */
+  centeredState: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  centeredText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
   header: {
     position: "absolute",
     top: 0,
@@ -234,6 +214,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
   },
   title: {
     color: COLORS.text,
@@ -241,10 +222,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.2,
   },
-  pinCountBadge: {
+  countBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 6,
     backgroundColor: "rgba(60,64,68,0.88)",
     borderRadius: 999,
     paddingHorizontal: 12,
@@ -252,84 +233,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.15)",
   },
-  pinCountText: {
+  countText: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "700",
-  },
-
-  /* ── Callout ─────────────────────────────────── */
-  calloutTooltip: {
-    // tooltip=true means we own the entire callout bubble
-  },
-  callout: {
-    backgroundColor: "#2B2E31",
-    borderRadius: 12,
-    padding: 10,
-    width: 170,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-    // Drop shadow for iOS
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  calloutImage: {
-    width: "100%",
-    height: 88,
-    borderRadius: 8,
-    marginBottom: 8,
-    resizeMode: "cover",
-    backgroundColor: "rgba(221,220,219,0.08)",
-  },
-  calloutSpecies: {
-    color: COLORS.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  calloutDate: {
-    color: COLORS.textSecondary,
-    fontSize: 11,
-    marginTop: 2,
-  },
-
-  /* ── Loading overlay ─────────────────────────── */
-  loadingOverlay: {
-    position: "absolute",
-    bottom: 40,
-    alignSelf: "center",
-    backgroundColor: "rgba(60,64,68,0.88)",
-    borderRadius: 999,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-
-  /* ── Empty state ─────────────────────────────── */
-  emptyCard: {
-    position: "absolute",
-    left: 24,
-    right: 24,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: "rgba(60,64,68,0.92)",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  emptyTitle: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  emptySubtitle: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
-    lineHeight: 16,
   },
 });
