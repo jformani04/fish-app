@@ -1,4 +1,5 @@
 import { COLORS } from "@/lib/colors";
+import Avatar from "@/components/Avatar";
 import {
   acceptFriendRequest,
   cancelFriendRequest,
@@ -264,15 +265,7 @@ export default function UserProfileScreen() {
       {/* Profile Card */}
       <View style={styles.profileCard}>
         <View style={styles.profileRow}>
-          {profile.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <Text style={styles.avatarFallbackText}>
-                {profile.username.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
+          <Avatar uri={profile.avatarUrl} username={profile.username} size={72} />
           <View style={{ flex: 1 }}>
             <Text style={styles.username}>{profile.username}</Text>
             {!!profile.createdAt && (
@@ -401,7 +394,11 @@ export default function UserProfileScreen() {
       ) : (
         <View style={styles.list}>
           {catches.map((catchLog) => (
-            <View key={catchLog.id} style={styles.catchCard}>
+            <Pressable
+              key={catchLog.id}
+              style={styles.catchCard}
+              onPress={() => router.push(`/user/catch/${catchLog.id}`)}
+            >
               <View style={styles.catchRow}>
                 <View style={styles.thumbWrap}>
                   {catchLog.imageUrl ? (
@@ -445,7 +442,7 @@ export default function UserProfileScreen() {
                   </View>
                 </View>
               </View>
-            </View>
+            </Pressable>
           ))}
         </View>
       )}

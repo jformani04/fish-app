@@ -424,6 +424,53 @@ export async function getFriendFeed(friendIds: string[]): Promise<FeedItem[]> {
   });
 }
 
+export type PublicCatchDetail = {
+  id: string;
+  imageUrl: string;
+  species: string;
+  length: string;
+  weight: string;
+  location: string;
+  temperature: string;
+  weather: string;
+  lure: string;
+  method: string;
+  notes: string;
+  date: string;
+};
+
+export async function getPublicCatchById(catchId: string): Promise<PublicCatchDetail | null> {
+  const { data, error } = await supabase
+    .from("catch_logs")
+    .select(
+      "id, image_url, species, length, weight, location, temperature, weather, lure, method, notes, date, is_public"
+    )
+    .eq("id", catchId)
+    .eq("is_public", true)
+    .single();
+
+  if (error) {
+    if ((error as any).code === "PGRST116") return null;
+    throw error;
+  }
+
+  const row = data as any;
+  return {
+    id: row.id,
+    imageUrl: row.image_url ?? "",
+    species: row.species ?? "",
+    length: row.length ?? "",
+    weight: row.weight ?? "",
+    location: row.location ?? "",
+    temperature: row.temperature ?? "",
+    weather: row.weather ?? "",
+    lure: row.lure ?? "",
+    method: row.method ?? "",
+    notes: row.notes ?? "",
+    date: row.date ?? "",
+  };
+}
+
 export async function getFriendPublicCatches(friendId: string) {
   const { data, error } = await supabase
     .from("catch_logs")

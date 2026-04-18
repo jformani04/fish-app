@@ -65,8 +65,8 @@ function normalizeUnitTemp(value: unknown): TempUnit {
   return value === "fahrenheit" ? "fahrenheit" : "celsius";
 }
 
-async function ensureProfileRow(userId: string, email: string | undefined) {
-  const usernameFallback = email?.split("@")[0] || "Angler";
+async function ensureProfileRow(userId: string, email: string | undefined, username?: string) {
+  const usernameFallback = username || email?.split("@")[0] || "Angler";
 
   const payload = {
     id: userId,
@@ -102,7 +102,8 @@ export async function getProfile(): Promise<Profile> {
     .single();
 
   if (error && (error as any).code === "PGRST116") {
-    await ensureProfileRow(user.id, user.email);
+    const metaUsername = user.user_metadata?.username as string | undefined;
+    await ensureProfileRow(user.id, user.email, metaUsername);
     const retry = await supabase
       .from("profiles")
       .select("*")

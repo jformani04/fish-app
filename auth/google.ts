@@ -33,8 +33,14 @@ export async function signInWithGoogle() {
     if (!data?.url) throw new Error("No OAuth URL returned");
 
     const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+
+    // User deliberately closed the browser — not an error, exit silently.
+    if (result.type === "cancel" || result.type === "dismiss") {
+      return;
+    }
+
     if (result.type !== "success") {
-      throw new Error("Login canceled or failed");
+      throw new Error("Sign-in failed. Please try again.");
     }
 
     // Some providers return tokens in the query string, others in the URL fragment.

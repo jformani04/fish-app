@@ -1,13 +1,12 @@
 import { Pressable, Text, StyleSheet } from "react-native";
 import { supabase } from "@/lib/supabase";
-import { router } from "expo-router";
 
 export default function LogoutButton() {
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-    if (!error) {
-      router.replace("/(auth)/login"); // redirect to login page
-    } else {
+    // Navigation is handled by the SIGNED_OUT listener in app/_layout.tsx.
+    // No router.replace here to avoid two competing navigation calls.
+    if (error) {
       console.log("Logout error:", error.message);
     }
   };

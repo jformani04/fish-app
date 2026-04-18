@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify your Anglr account</title>
+  <!--
+    HOW TO USE:
+    1. Go to Supabase Dashboard → Authentication → Email Templates
+    2. Select "Confirm Signup"
+    3. Paste the contents of this file into the "Body" field
+    4. Set Subject to: "Verify your Anglr account"
+    5. Save — do NOT change the {{ .ConfirmationURL }} placeholder
+  -->
+</head>
+<body style="margin:0;padding:0;background-color:#111214;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#111214;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;">
+
+          <!-- Logo / App Name -->
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <span style="font-size:28px;font-weight:800;color:#fd7b41;letter-spacing:-0.5px;">Anglr</span>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#1c1e21;border-radius:20px;padding:36px 32px;border:1px solid rgba(255,255,255,0.08);">
+
+              <!-- Icon -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                <tr>
+                  <td align="center">
+                    <div style="width:56px;height:56px;background-color:rgba(253,123,65,0.15);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:2px solid rgba(253,123,65,0.35);">
+                      <span style="font-size:24px;">🎣</span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Heading -->
+              <h1 style="margin:0 0 12px;font-size:22px;font-weight:700;color:#f0efee;text-align:center;line-height:1.3;">
+                Verify your email address
+              </h1>
+
+              <!-- Body text -->
+              <p style="margin:0 0 28px;font-size:15px;color:#9a9898;text-align:center;line-height:1.6;">
+                Thanks for signing up for Anglr! Click the button below to verify your email address and activate your account.
+              </p>
+
+              <!-- CTA Button -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                <tr>
+                  <td align="center">
+                    <a
+                      href="{{ .ConfirmationURL }}"
+                      style="display:inline-block;background-color:#fd7b41;color:#000000;font-size:15px;font-weight:700;text-decoration:none;padding:14px 36px;border-radius:999px;letter-spacing:0.3px;"
+                    >
+                      Verify Email
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Expiry note -->
+              <p style="margin:0 0 20px;font-size:13px;color:#6b6969;text-align:center;line-height:1.5;">
+                This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.
+              </p>
+
+              <!-- Divider -->
+              <hr style="border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0 0 20px;" />
+
+              <!-- Fallback link -->
+              <p style="margin:0;font-size:12px;color:#6b6969;text-align:center;line-height:1.6;">
+                Button not working? Copy and paste this link into your browser:<br />
+                <span style="color:#fd7b41;word-break:break-all;">{{ .ConfirmationURL }}</span>
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:24px;">
+              <p style="margin:0;font-size:12px;color:#4a4848;">
+                © Anglr · You're receiving this because you created an account.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,4 +1,5 @@
 import { COLORS } from "@/lib/colors";
+import Avatar from "@/components/Avatar";
 import {
   acceptFriendRequest,
   cancelFriendRequest,
@@ -33,37 +34,6 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-function Avatar({
-  url,
-  size = 48,
-}: {
-  url: string | null;
-  size?: number;
-}) {
-  if (url) {
-    return (
-      <Image
-        source={{ uri: url }}
-        style={[
-          styles.avatar,
-          { width: size, height: size, borderRadius: size / 2 },
-        ]}
-      />
-    );
-  }
-  return (
-    <View
-      style={[
-        styles.avatarFallback,
-        { width: size, height: size, borderRadius: size / 2 },
-      ]}
-    >
-      <Text style={{ color: COLORS.primary, fontWeight: "700", fontSize: size * 0.35 }}>
-        ?
-      </Text>
-    </View>
-  );
-}
 
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
@@ -263,7 +233,7 @@ export default function FriendsScreen() {
                     style={styles.card}
                     onPress={() => router.push(`/user/${user.id}`)}
                   >
-                    <Avatar url={user.avatarUrl} size={44} />
+                    <Avatar uri={user.avatarUrl} username={user.username} size={44} />
                     <View style={styles.cardContent}>
                       <Text style={styles.username}>{user.username}</Text>
                       {!!user.bio && (
@@ -310,7 +280,7 @@ export default function FriendsScreen() {
                   style={styles.cardPressable}
                   onPress={() => router.push(`/user/${req.profile.id}`)}
                 >
-                  <Avatar url={req.profile.avatarUrl} size={44} />
+                  <Avatar uri={req.profile.avatarUrl} username={req.profile.username} size={44} />
                   <View style={styles.cardContent}>
                     <Text style={styles.username}>{req.profile.username}</Text>
                     {!!req.profile.bio && (
@@ -365,7 +335,7 @@ export default function FriendsScreen() {
                 style={styles.card}
                 onPress={() => router.push(`/user/${req.profile.id}`)}
               >
-                <Avatar url={req.profile.avatarUrl} size={44} />
+                <Avatar uri={req.profile.avatarUrl} username={req.profile.username} size={44} />
                 <View style={styles.cardContent}>
                   <Text style={styles.username}>{req.profile.username}</Text>
                   {!!req.profile.bio && (
@@ -417,7 +387,7 @@ export default function FriendsScreen() {
                   style={styles.card}
                   onPress={() => router.push(`/user/${friend.id}`)}
                 >
-                  <Avatar url={friend.avatarUrl} size={44} />
+                  <Avatar uri={friend.avatarUrl} username={friend.username} size={44} />
                   <View style={styles.cardContent}>
                     <Text style={styles.username}>{friend.username}</Text>
                     {!!friend.bio && (

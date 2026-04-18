@@ -9,6 +9,8 @@ import {
   uploadAvatar,
   WeightUnit,
 } from "@/lib/profile";
+import { validateRegisterPassword } from "@/lib/validation/authValidation";
+import Avatar from "@/components/Avatar";
 import { CatchLog, getUserCatchLogs } from "@/lib/catches";
 import { supabase } from "@/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
@@ -105,10 +107,13 @@ export default function ProfileScreen() {
   const [modalType, setModalType] = useState<ModalType>("none");
   const [emailDraft, setEmailDraft] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
+  const [confirmPasswordDraft, setConfirmPasswordDraft] = useState("");
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef("");
-  const isGoogleSignedIn = authProvider === "google";
+  // Only disable email/password controls when the user has Google but no email
+  // provider. Linked accounts (both google + email) can still manage credentials.
+  const isGoogleOnly = authProviders.includes("google") && !authProviders.includes("email");
 
   useEffect(() => {
     const load = async () => {
@@ -255,14 +260,24 @@ export default function ProfileScreen() {
   const handleChangePassword = async () => {
     try {
       const value = passwordDraft.trim();
-      if (value.length < 8) {
-        Alert.alert("Invalid Password", "Use at least 8 characters.");
+      const confirm = confirmPasswordDraft.trim();
+
+      const strength = validateRegisterPassword(value);
+      if (!strength.valid) {
+        Alert.alert("Weak Password", strength.message ?? "Password does not meet requirements.");
         return;
       }
+
+      if (value !== confirm) {
+        Alert.alert("Password Mismatch", "Passwords do not match. Please try again.");
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({ password: value });
       if (error) throw error;
       Alert.alert("Password Updated", "Your password has been changed.");
       setPasswordDraft("");
+      setConfirmPasswordDraft("");
       setModalType("none");
     } catch (err: any) {
       Alert.alert("Password Update Failed", err?.message ?? "Unable to change password.");
@@ -334,14 +349,15 @@ export default function ProfileScreen() {
           <View style={styles.card}>
             <View style={styles.profileRow}>
               <View style={styles.avatarWrap}>
-                <Image
-                  source={{
-                    uri:
-                      avatarUrl ??
-                      Image.resolveAssetSource(require("@/assets/images/appIcon.png")).uri,
-                  }}
-                  style={styles.avatar}
-                />
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarLetterFallback]}>
+                    <Text style={styles.avatarLetterText}>
+                      {username?.charAt(0)?.toUpperCase() || "?"}
+                    </Text>
+                  </View>
+                )}
                 <Pressable
                   onPress={changeAvatar}
                   style={[styles.cameraButton, uploadingAvatar && { opacity: 0.7 }]}
@@ -518,50 +534,50 @@ export default function ProfileScreen() {
         <View>
           <Text style={styles.sectionLabel}>Security</Text>
           <Pressable
-            style={[styles.actionCard, isGoogleSignedIn && styles.actionCardDisabled]}
-            onPress={isGoogleSignedIn ? undefined : handleChangeEmailPress}
-            disabled={isGoogleSignedIn}
+            style={[styles.actionCard, isGoogleOnly && styles.actionCardDisabled]}
+            onPress={isGoogleOnly ? undefined : handleChangeEmailPress}
+            disabled={isGoogleOnly}
           >
-            <View style={[styles.actionIcon, isGoogleSignedIn && styles.actionIconDisabled]}>
+            <View style={[styles.actionIcon, isGoogleOnly && styles.actionIconDisabled]}>
               <Mail
-                color={isGoogleSignedIn ? COLORS.textSecondary : COLORS.primary}
+                color={isGoogleOnly ? COLORS.textSecondary : COLORS.primary}
                 size={20}
                 strokeWidth={2}
               />
             </View>
             <View>
-              <Text style={[styles.actionTitle, isGoogleSignedIn && styles.actionTextDisabled]}>
+              <Text style={[styles.actionTitle, isGoogleOnly && styles.actionTextDisabled]}>
                 Change Email
               </Text>
-              <Text style={[styles.actionSub, isGoogleSignedIn && styles.actionTextDisabled]}>
+              <Text style={[styles.actionSub, isGoogleOnly && styles.actionTextDisabled]}>
                 {email || "-"}
               </Text>
             </View>
           </Pressable>
 
           <Pressable
-            style={[styles.actionCard, isGoogleSignedIn && styles.actionCardDisabled]}
-            onPress={isGoogleSignedIn ? undefined : handleChangePasswordPress}
-            disabled={isGoogleSignedIn}
+            style={[styles.actionCard, isGoogleOnly && styles.actionCardDisabled]}
+            onPress={isGoogleOnly ? undefined : handleChangePasswordPress}
+            disabled={isGoogleOnly}
           >
-            <View style={[styles.actionIcon, isGoogleSignedIn && styles.actionIconDisabled]}>
+            <View style={[styles.actionIcon, isGoogleOnly && styles.actionIconDisabled]}>
               <Lock
-                color={isGoogleSignedIn ? COLORS.textSecondary : COLORS.primary}
+                color={isGoogleOnly ? COLORS.textSecondary : COLORS.primary}
                 size={20}
                 strokeWidth={2}
               />
             </View>
             <View>
-              <Text style={[styles.actionTitle, isGoogleSignedIn && styles.actionTextDisabled]}>
+              <Text style={[styles.actionTitle, isGoogleOnly && styles.actionTextDisabled]}>
                 Change Password
               </Text>
-              <Text style={[styles.actionSub, isGoogleSignedIn && styles.actionTextDisabled]}>
+              <Text style={[styles.actionSub, isGoogleOnly && styles.actionTextDisabled]}>
                 Update your password
               </Text>
             </View>
           </Pressable>
 
-          {isGoogleSignedIn ? (
+          {isGoogleOnly ? (
             <Text style={styles.securityNotice}>
               You are signed in with Google, so email and password changes are managed by your
               Google account.
@@ -623,8 +639,26 @@ export default function ProfileScreen() {
               placeholderTextColor={COLORS.textSecondary}
               style={styles.modalInput}
             />
+            {modalType === "password" && (
+              <TextInput
+                value={confirmPasswordDraft}
+                onChangeText={setConfirmPasswordDraft}
+                autoCapitalize="none"
+                secureTextEntry
+                placeholder="Confirm new password"
+                placeholderTextColor={COLORS.textSecondary}
+                style={[styles.modalInput, { marginTop: 10 }]}
+              />
+            )}
             <View style={styles.modalActions}>
-              <Pressable style={styles.modalSecondary} onPress={() => setModalType("none")}>
+              <Pressable
+                style={styles.modalSecondary}
+                onPress={() => {
+                  setPasswordDraft("");
+                  setConfirmPasswordDraft("");
+                  setModalType("none");
+                }}
+              >
                 <Text style={styles.modalSecondaryText}>Cancel</Text>
               </Pressable>
               <Pressable
@@ -712,6 +746,16 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 2,
     borderColor: COLORS.primary,
+  },
+  avatarLetterFallback: {
+    backgroundColor: "rgba(110,110,120,0.3)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarLetterText: {
+    color: "#fff",
+    fontSize: 30,
+    fontWeight: "700",
   },
   cameraButton: {
     position: "absolute",

@@ -1,6 +1,4 @@
 import { supabase } from "@/lib/supabase";
-import * as FileSystem from "expo-file-system";
-import { decode } from "base64-arraybuffer";
 
 const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
 
@@ -342,13 +340,12 @@ export async function uploadCatchPhoto(fileUri: string): Promise<string> {
   if (!user) throw new Error("No authenticated user");
 
   const filePath = `${user.id}/${Date.now()}.jpg`;
-  const base64 = await FileSystem.readAsStringAsync(fileUri, {
-    encoding: "base64" as any,
-  });
+  const response = await fetch(fileUri);
+  const blob = await response.blob();
 
   const { error: uploadError } = await supabase.storage
     .from("catch_photos")
-    .upload(filePath, decode(base64), {
+    .upload(filePath, blob, {
       contentType: "image/jpeg",
       upsert: false,
     });

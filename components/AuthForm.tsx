@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, TextInput, Pressable, Image, StyleSheet } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { router } from "expo-router";
@@ -38,10 +38,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [oauthHint, setOauthHint] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Tick the resend cooldown down by one second until it reaches zero.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const clearErrors = () => {
     setFormError(null);
     setOauthHint(null);
+    setSuccessMessage(null);
   };
 
   const validateBeforeSubmit = () => {
@@ -153,6 +164,21 @@ export default function AuthForm({ mode }: AuthFormProps) {
     passwordValue: string
   ): Promise<AuthResult> => {
     try {
+      // Pre-check: detect Google-only accounts before attempting signUp so the
+      // user gets a clear hint instead of Supabase's silent fake-success response.
+      try {
+        const lookup = await supabase.functions.invoke("lookup_auth_providers", {
+          body: { email: emailValue },
+        });
+        const providers = (lookup.data?.providers as string[] | undefined) ?? [];
+        if (providers.includes("google") && !providers.includes("email")) {
+          setOauthHint(GOOGLE_ONLY_LOGIN_MESSAGE);
+          return { success: false, error: GOOGLE_ONLY_LOGIN_MESSAGE };
+        }
+      } catch {
+        // Non-fatal: proceed with signUp if the edge function is unavailable.
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: emailValue,
         password: passwordValue,
@@ -165,15 +191,43 @@ export default function AuthForm({ mode }: AuthFormProps) {
         return { success: false, error: mapAuthErrorMessage(error.message) };
       }
 
-      if (data.session) {
+      // Supabase returns an empty identities array as a "fake success" when email
+      // confirmation is enabled and the email is already registered. No real
+      // account is created and no email is sent in this case.
+      if (data.user && (data.user.identities?.length ?? 0) === 0) {
+        return {
+          success: false,
+          error: "An account with this email already exists. Try signing in or use Forgot Password.",
+        };
+      }
+
+      if (data.session && data.user) {
+        // Email confirmation is disabled: create the profile row immediately
+        // with the username the user actually chose.
+        await supabase.from("profiles").upsert(
+          {
+            id: data.user.id,
+            username: usernameValue,
+            bio: "",
+            avatar_url: null,
+            units_length: "cm",
+            units_weight: "kg",
+            units_temp: "celsius",
+          },
+          { onConflict: "id" }
+        );
         router.replace("/home");
         return { success: true, session: data.session };
       }
 
       if (data.user) {
+        // Email confirmation is enabled: the user must verify before logging in.
+        // Profile will be created on first login via ensureProfileRow, which now
+        // reads username from user_metadata set above.
+        setPendingVerificationEmail(emailValue);
         return {
           success: true,
-          message: "Account created. Please check your email to confirm your account.",
+          message: "Account created! Check your email to verify your account before signing in.",
         };
       }
 
@@ -181,6 +235,22 @@ export default function AuthForm({ mode }: AuthFormProps) {
     } catch (err) {
       if (DEBUG) console.log("Unexpected registration error", err);
       return { success: false, error: "Network error. Please try again." };
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail || resendCooldown > 0) return;
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: pendingVerificationEmail,
+      });
+      if (error) throw error;
+      setResendCooldown(60);
+      setSuccessMessage("Verification email sent! Check your inbox.");
+    } catch (err: any) {
+      setFormError(err?.message ?? "Failed to resend. Please try again.");
+      setSuccessMessage(null);
     }
   };
 
@@ -219,7 +289,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
     }
 
     if (result.message) {
-      setFormError(result.message);
+      setSuccessMessage(result.message);
     }
   };
 
@@ -297,6 +367,23 @@ export default function AuthForm({ mode }: AuthFormProps) {
         </View>
       )}
 
+      {successMessage && (
+        <View style={styles.successCard}>
+          <Text style={styles.successText}>{successMessage}</Text>
+          {pendingVerificationEmail && (
+            resendCooldown > 0 ? (
+              <Text style={styles.resendCooldown}>
+                Resend available in {resendCooldown}s
+              </Text>
+            ) : (
+              <Text onPress={handleResendVerification} style={styles.resendLink}>
+                Resend verification email
+              </Text>
+            )
+          )}
+        </View>
+      )}
+
       {isLogin && (
         <Text onPress={() => router.push("/forgot_password")} style={styles.forgotPassword}>
           Forgot Password?
@@ -313,7 +400,7 @@ export default function AuthForm({ mode }: AuthFormProps) {
         </Text>
       </Pressable>
 
-      {isLogin && oauthHint && (
+      {oauthHint && (
         <View style={styles.oauthHintCard}>
           <Text style={styles.oauthHintText}>{oauthHint}</Text>
         </View>
@@ -431,5 +518,32 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+  successCard: {
+    marginTop: -6,
+    marginBottom: 10,
+    borderRadius: 12,
+    padding: 10,
+    backgroundColor: "rgba(34,197,94,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.4)",
+  },
+  successText: {
+    color: "#bbf7d0",
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  resendLink: {
+    color: "#4ade80",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 6,
+    textDecorationLine: "underline",
+  },
+  resendCooldown: {
+    color: "#6ee7b7",
+    fontSize: 12,
+    marginTop: 6,
+    opacity: 0.7,
   },
 });

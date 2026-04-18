@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Session, User, } from "@supabase/supabase-js";
+import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { getUserProviders } from "@/lib/authProviders";
 
 export type UserProfile = {
   id: string;
@@ -17,6 +18,17 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// Returns true when an email/password account has not yet verified their email.
+// Google accounts always have email_confirmed_at set by the OAuth provider, so
+// they are never blocked. Linked accounts (email + google) are also not blocked.
+function isEmailUnverified(user: User): boolean {
+  const providers = getUserProviders(user);
+  const hasOnlyEmailProvider =
+    providers.length === 0 ||
+    (providers.length === 1 && providers[0] === "email");
+  return hasOnlyEmailProvider && !user.email_confirmed_at;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -36,32 +48,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const fetchSessionAndProfile = async () => {
       const { data: sessionData } = await supabase.auth.getSession();
-      setSession(sessionData.session);
-      setUser(sessionData.session?.user || null);
+      const currentUser = sessionData.session?.user ?? null;
 
-      if (sessionData.session?.user) {
-        await loadProfile(sessionData.session.user.id);
+      // Clear any persisted session that belongs to an unverified email account.
+      // This guards against stale tokens from before email confirmation was enabled.
+      if (currentUser && isEmailUnverified(currentUser)) {
+        await supabase.auth.signOut();
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      setSession(sessionData.session);
+      setUser(currentUser);
+
+      if (currentUser) {
+        await loadProfile(currentUser.id);
       } else {
         setProfile(null);
       }
-
       setLoading(false);
     };
 
     fetchSessionAndProfile();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user || null);
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
 
-      if (event === "SIGNED_OUT" || !session?.user) {
+      if (event === "SIGNED_IN" && currentUser) {
+        // Prevent unverified email accounts from entering the app. Supabase
+        // normally blocks login before a session is issued, but this is a
+        // defense-in-depth check for edge cases (e.g. Google auto-link of an
+        // unconfirmed email account).
+        if (isEmailUnverified(currentUser)) {
+          await supabase.auth.signOut();
+          return;
+        }
+      }
+
+      setSession(session);
+      setUser(currentUser);
+
+      if (event === "SIGNED_OUT" || !currentUser) {
         setProfile(null);
         return;
       }
 
       // Avoid repeated profile fetches on token refresh events.
       if (event === "SIGNED_IN" || event === "USER_UPDATED") {
-        loadProfile(session.user.id);
+        loadProfile(currentUser.id);
       }
     });
 

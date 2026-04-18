@@ -1,6 +1,6 @@
 import { COLORS } from "@/lib/colors";
 import { router, useLocalSearchParams } from "expo-router";
-import { ArrowLeft, Check } from "lucide-react-native";
+import { ArrowLeft, Camera, Check } from "lucide-react-native";
 import {
   Image,
   Pressable,
@@ -29,7 +29,9 @@ export default function ImageReviewScreen() {
           <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
         </Pressable>
         <Text style={styles.title}>Review Photo</Text>
-        <View style={styles.iconButton} />
+        <Pressable onPress={() => router.back()} style={styles.iconButton}>
+          <Camera color={COLORS.textSecondary} size={18} strokeWidth={2} />
+        </Pressable>
       </View>
 
       {/* Image */}

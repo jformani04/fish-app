@@ -30,6 +30,7 @@ import {
   View,
 } from "react-native";
 import ScanButton from "../../components/ScanButton";
+import Avatar from "@/components/Avatar";
 
 const VIEW_CATCHES_ICON = require("@/assets/images/viewCatches.png");
 const FAVORITES_ICON = require("@/assets/images/favorites.png");
@@ -37,38 +38,6 @@ const ARTICLES_ICON = require("@/assets/images/articles.png");
 const TOTAL_CATCHES_ICON = require("@/assets/images/totalCatches.png");
 const CLOCK_ICON = require("@/assets/images/clock.png");
 
-function FeedAvatar({ url, size = 36 }: { url: string | null; size?: number }) {
-  if (url) {
-    return (
-      <Image
-        source={{ uri: url }}
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: 2,
-          borderColor: COLORS.primary,
-        }}
-      />
-    );
-  }
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor: "rgba(253,123,65,0.15)",
-        borderWidth: 2,
-        borderColor: COLORS.primary,
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <User size={size * 0.45} color={COLORS.primary} />
-    </View>
-  );
-}
 
 export default function Home() {
   const { width } = useWindowDimensions();
@@ -184,16 +153,11 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Pressable onPress={() => router.push("/profile")}>
-            {profile?.avatar_url ? (
-              <Image
-                source={{ uri: profile.avatar_url }}
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={styles.avatarFallback}>
-                <User size={28} color={COLORS.primary} />
-              </View>
-            )}
+            <Avatar
+              uri={profile?.avatar_url}
+              username={profile?.username}
+              size={44}
+            />
           </Pressable>
           <View style={styles.headerText}>
             <Text style={styles.title}>Anglr</Text>
@@ -400,7 +364,7 @@ export default function Home() {
             >
               {/* Angler row */}
               <View style={styles.feedAnglerRow}>
-                <FeedAvatar url={item.avatarUrl} size={32} />
+                <Avatar uri={item.avatarUrl} username={item.username} size={32} />
                 <Text style={styles.feedAnglerName}>{item.username}</Text>
                 <Text style={styles.feedDate}>{item.date}</Text>
               </View>
