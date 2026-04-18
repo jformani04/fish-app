@@ -1,4 +1,5 @@
 import { AuthProvider } from "@/auth/AuthProvider";
+import { FriendsProvider } from "@/auth/FriendsProvider";
 import { supabase } from "@/lib/supabase";
 import { router, Stack, useSegments } from "expo-router";
 import { useEffect } from "react";
@@ -42,6 +43,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <FriendsProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
@@ -49,6 +51,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="log" />
       </Stack>
+      </FriendsProvider>
     </AuthProvider>
   );
 }

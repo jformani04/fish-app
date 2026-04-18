@@ -9,6 +9,7 @@ import {
   uploadAvatar,
   WeightUnit,
 } from "@/lib/profile";
+import { CatchLog, getUserCatchLogs } from "@/lib/catches";
 import { supabase } from "@/lib/supabase";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
@@ -36,6 +37,41 @@ import {
 
 type ModalType = "none" | "email" | "password";
 
+function parseMeasurement(val: string): number {
+  const m = val.match(/[\d.]+/);
+  return m ? parseFloat(m[0]) : 0;
+}
+
+function computeCatchStats(catches: CatchLog[]) {
+  if (catches.length === 0) {
+    return { totalCatches: 0, speciesCount: 0, biggestFish: "-" };
+  }
+
+  const speciesSet = new Set(
+    catches.map((c) => c.species.trim().toLowerCase()).filter(Boolean)
+  );
+
+  const byWeight = catches.reduce((best, c) =>
+    parseMeasurement(c.weight) > parseMeasurement(best.weight) ? c : best
+  );
+  const byLength = catches.reduce((best, c) =>
+    parseMeasurement(c.length) > parseMeasurement(best.length) ? c : best
+  );
+
+  let biggestFish = "-";
+  if (byWeight.weight.trim()) {
+    biggestFish = `${byWeight.species || "Unknown"} (${byWeight.weight})`;
+  } else if (byLength.length.trim()) {
+    biggestFish = `${byLength.species || "Unknown"} (${byLength.length})`;
+  }
+
+  return {
+    totalCatches: catches.length,
+    speciesCount: speciesSet.size,
+    biggestFish,
+  };
+}
+
 function formatMemberSince(createdAt: string | null) {
   if (!createdAt) return "Member since -";
   const date = new Date(createdAt);
@@ -60,6 +96,12 @@ export default function ProfileScreen() {
   const [authProvider, setAuthProvider] = useState<string>("email");
   const [authProviders, setAuthProviders] = useState<string[]>([]);
 
+  const [catchStats, setCatchStats] = useState({
+    totalCatches: 0,
+    speciesCount: 0,
+    biggestFish: "-",
+  });
+
   const [modalType, setModalType] = useState<ModalType>("none");
   const [emailDraft, setEmailDraft] = useState("");
   const [passwordDraft, setPasswordDraft] = useState("");
@@ -72,7 +114,13 @@ export default function ProfileScreen() {
     const load = async () => {
       try {
         setLoading(true);
-        const profile = await getProfile();
+        const [profile, catches] = await Promise.all([
+          getProfile(),
+          (async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            return user ? getUserCatchLogs(user.id) : ([] as CatchLog[]);
+          })(),
+        ]);
         setUsername(profile.username);
         setBio(profile.bio);
         setLengthUnit(profile.unitsLength);
@@ -93,6 +141,7 @@ export default function ProfileScreen() {
           avatarUrl: profile.avatarUrl,
         });
         hydratedRef.current = true;
+        setCatchStats(computeCatchStats(catches));
       } catch (err: any) {
         Alert.alert("Profile Error", err?.message ?? "Unable to load profile.");
       } finally {
@@ -325,6 +374,29 @@ export default function ProfileScreen() {
             />
 
             {saving ? <Text style={styles.autoSaveText}>Saving changes...</Text> : null}
+          </View>
+        </View>
+
+        {/* Stats */}
+        <View>
+          <Text style={styles.sectionLabel}>Your Stats</Text>
+          <View style={styles.statsCard}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{catchStats.totalCatches}</Text>
+              <Text style={styles.statLabel}>Catches</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{catchStats.speciesCount}</Text>
+              <Text style={styles.statLabel}>Species</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={[styles.statItem, { flex: 2 }]}>
+              <Text style={styles.statValue} numberOfLines={1}>
+                {catchStats.biggestFish}
+              </Text>
+              <Text style={styles.statLabel}>Biggest Fish</Text>
+            </View>
           </View>
         </View>
 
@@ -688,6 +760,38 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: COLORS.textSecondary,
     fontSize: 12,
+  },
+  // Stats card
+  statsCard: {
+    backgroundColor: "rgba(221,220,219,0.08)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.15)",
+    borderRadius: 24,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  statLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+    textAlign: "center",
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    marginHorizontal: 8,
   },
   prefCard: {
     backgroundColor: "rgba(221,220,219,0.08)",
