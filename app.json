@@ -23,7 +23,7 @@
       "package": "com.anglr",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/appIcon.png",
-        "backgroundColor": "#3C4044"
+        "backgroundColor": "#111315"
       },
       "config": {
         "googleMaps": {
@@ -44,7 +44,7 @@
     "splash": {
       "image": "./assets/images/splashScreenIcon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#3C4044"
+      "backgroundColor": "#111315"
     },
     "plugins": [
       "expo-router",

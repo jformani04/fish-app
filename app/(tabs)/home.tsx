@@ -14,7 +14,6 @@ import {
   Map,
   MapPin,
   Ruler,
-  User,
   Users,
   Weight,
 } from "lucide-react-native";
@@ -26,7 +25,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import ScanButton from "../../components/ScanButton";
@@ -40,7 +38,6 @@ const CLOCK_ICON = require("@/assets/images/clock.png");
 
 
 export default function Home() {
-  const { width } = useWindowDimensions();
   const { profile, loading } = useAuth();
   const { friends, pendingRequests } = useFriends();
   const isFocused = useIsFocused();
@@ -52,9 +49,6 @@ export default function Home() {
   const [feedLoading, setFeedLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  const H_PADDING = 48;
-  const GAP = 16;
-  const cardWidth = (width - H_PADDING - GAP) / 2;
 
   const handleSignOut = async () => {
     const { error } = await supabase.auth.signOut();
@@ -178,62 +172,62 @@ export default function Home() {
       <Text style={styles.sectionLabel}>Quick Actions</Text>
       <View style={styles.rowGrid}>
         <Pressable
-          style={[styles.actionBubble, styles.actionBubbleCentered, { width: cardWidth }]}
+          style={[styles.actionBubble, { flex: 1 }]}
           onPress={() => router.push("/catches")}
         >
-          <View style={styles.actionIconCentered}>
-            <Image source={VIEW_CATCHES_ICON} style={styles.actionIconImage} />
+          <View style={styles.actionIconSmall}>
+            <Image source={VIEW_CATCHES_ICON} style={styles.actionIconImageSmall} />
           </View>
-          <Text style={[styles.actionText, styles.actionTextCentered]}>View Catches</Text>
+          <Text style={styles.actionText}>View Catches</Text>
         </Pressable>
 
         <Pressable
-          style={[styles.actionBubble, styles.actionBubbleCentered, { width: cardWidth }]}
+          style={[styles.actionBubble, { flex: 1 }]}
           onPress={() => router.push("/favorites")}
         >
-          <View style={styles.actionIconCentered}>
-            <Image source={FAVORITES_ICON} style={styles.actionIconImage} />
+          <View style={styles.actionIconSmall}>
+            <Image source={FAVORITES_ICON} style={styles.actionIconImageSmall} />
           </View>
-          <Text style={[styles.actionText, styles.actionTextCentered]}>Favorites</Text>
+          <Text style={styles.actionText}>Favorites</Text>
         </Pressable>
       </View>
 
       <Pressable
-        style={[styles.fullBubble, styles.fullBubbleCentered]}
+        style={styles.fullBubble}
         onPress={() => router.push("/articles")}
       >
-        <View style={styles.actionIconCentered}>
+        <View style={styles.fullBubbleIconWrap}>
           <Image
             source={ARTICLES_ICON}
-            style={[styles.actionIconImage, styles.speciesGuideIconImage]}
+            style={styles.fullBubbleIconImage}
           />
         </View>
-        <View style={styles.fullBubbleContentCentered}>
-          <Text style={[styles.actionText, styles.actionTextCentered]}>Species Guide</Text>
-          <Text style={[styles.actionSubtext, styles.actionTextCentered]}>Browse and learn</Text>
+        <View style={styles.fullBubbleContent}>
+          <Text style={styles.actionText}>Species Guide</Text>
+          <Text style={styles.actionSubtext}>Browse and learn</Text>
         </View>
       </Pressable>
 
       <Pressable
-        style={[styles.fullBubble, styles.fullBubbleCentered]}
+        style={styles.fullBubble}
         onPress={() => router.push("/map")}
       >
-        <View style={[styles.actionIconCentered, { height: 60 }]}>
-          <Map size={48} color={COLORS.primary} strokeWidth={1.5} />
+        <View style={styles.fullBubbleIconWrap}>
+          <Map size={24} color={COLORS.primary} strokeWidth={2} />
         </View>
-        <View style={styles.fullBubbleContentCentered}>
-          <Text style={[styles.actionText, styles.actionTextCentered]}>Catch Map</Text>
-          <Text style={[styles.actionSubtext, styles.actionTextCentered]}>View catches on a map</Text>
+        <View style={styles.fullBubbleContent}>
+          <Text style={styles.actionText}>Catch Map</Text>
+          <Text style={styles.actionSubtext}>View catches on a map</Text>
         </View>
       </Pressable>
 
       {/* Friends bubble with notification badge */}
       <Pressable
-        style={[styles.fullBubble, styles.fullBubbleCentered]}
+        style={styles.fullBubble}
         onPress={() => router.push("/friends")}
       >
-        <View style={[styles.actionIconCentered, styles.badgeWrap, { height: 60 }]}>
-          <Users size={48} color={COLORS.primary} strokeWidth={1.5} />
+        <View style={[styles.fullBubbleIconWrap, styles.badgeWrap]}>
+          <Users size={24} color={COLORS.primary} strokeWidth={2} />
           {hasPendingRequests && (
             <View style={styles.notifBadge}>
               <Text style={styles.notifBadgeText}>
@@ -242,9 +236,9 @@ export default function Home() {
             </View>
           )}
         </View>
-        <View style={styles.fullBubbleContentCentered}>
-          <Text style={[styles.actionText, styles.actionTextCentered]}>Friends</Text>
-          <Text style={[styles.actionSubtext, styles.actionTextCentered]}>
+        <View style={styles.fullBubbleContent}>
+          <Text style={styles.actionText}>Friends</Text>
+          <Text style={styles.actionSubtext}>
             {hasPendingRequests
               ? `${pendingRequests.length} pending request${pendingRequests.length > 1 ? "s" : ""}`
               : "Connect with other anglers"}
@@ -255,7 +249,7 @@ export default function Home() {
       {/* Your Stats */}
       <Text style={styles.sectionLabel}>Your Stats</Text>
       <View style={styles.rowGrid}>
-        <View style={[styles.statBubble, { width: cardWidth }]}>
+        <View style={styles.statBubble}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
               <Image source={TOTAL_CATCHES_ICON} style={styles.statIconImage} />
@@ -265,10 +259,10 @@ export default function Home() {
           <Text style={styles.statValue}>{stats.totalCatches}</Text>
         </View>
 
-        <View style={[styles.statBubble, { width: cardWidth }]}>
+        <View style={styles.statBubble}>
           <View style={styles.row}>
             <View style={styles.statIcon}>
-              <Fish size={28} color={COLORS.primary} />
+              <Fish size={24} color={COLORS.primary} />
             </View>
             <Text style={styles.statLabel}>Species</Text>
           </View>
@@ -280,7 +274,7 @@ export default function Home() {
       <Text style={styles.sectionLabel}>Recent Activity</Text>
       <View style={styles.activityBubble}>
         <View style={styles.row}>
-          <View style={styles.actionIcon}>
+          <View style={styles.activityIconWrap}>
             <Image source={CLOCK_ICON} style={styles.activityIconImage} />
           </View>
           <View style={styles.activityContent}>
@@ -485,100 +479,102 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     color: COLORS.textSecondary,
-    fontSize: 12,
-    letterSpacing: 2,
+    fontSize: 11,
+    letterSpacing: 1.6,
     textTransform: "uppercase",
-    marginBottom: 12,
+    fontWeight: "600",
+    marginBottom: 10,
+    marginTop: 4,
   },
 
   rowGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 24,
+    marginBottom: 12,
+    gap: 12,
   },
 
   actionBubble: {
-    backgroundColor: "rgba(221,220,219,0.08)",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "white",
-    borderRadius: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: "center",
+    gap: 8,
   },
-  actionBubbleCentered: {
+
+  actionIconSmall: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: "rgba(253,123,65,0.12)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  actionIconImageSmall: {
+    width: 30,
+    height: 30,
+    resizeMode: "contain",
   },
 
   fullBubble: {
-    backgroundColor: "rgba(221,220,219,0.08)",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "white",
-    borderRadius: 24,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    marginBottom: 24,
-  },
-  fullBubbleCentered: {
+    borderColor: "rgba(255,255,255,0.09)",
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 12,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 14,
   },
 
-  actionIcon: {
-    padding: 0,
-    borderRadius: 999,
-    backgroundColor: "transparent",
-    marginBottom: 8,
-    alignSelf: "flex-start",
-    width: 28,
-    height: 28,
+  fullBubbleIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "rgba(253,123,65,0.12)",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
-  actionIconCentered: {
-    width: 80,
-    height: 80,
-    marginBottom: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
+  fullBubbleIconImage: {
+    width: 26,
+    height: 26,
+    resizeMode: "contain",
   },
+  fullBubbleContent: {
+    flex: 1,
+  },
+
   badgeWrap: {
     position: "relative",
   },
   notifBadge: {
     position: "absolute",
-    top: 4,
-    right: 4,
+    top: -4,
+    right: -4,
     backgroundColor: "#ef4444",
     borderRadius: 999,
-    minWidth: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
   notifBadgeText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
-  },
-  actionIconImage: {
-    width: 80,
-    height: 80,
-    resizeMode: "contain",
-  },
-  speciesGuideIconImage: {
-    transform: [{ scale: 1.5 }],
   },
 
   actionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    color: "white",
-  },
-  actionTextCentered: {
-    textAlign: "center",
+    color: COLORS.text,
   },
 
   actionSubtext: {
@@ -588,50 +584,47 @@ const styles = StyleSheet.create({
   },
 
   statBubble: {
-    backgroundColor: "rgba(221,220,219,0.08)",
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    borderColor: "white",
+    borderColor: "rgba(255,255,255,0.09)",
+    flex: 1,
   },
 
   statIcon: {
-    padding: 0,
-    borderRadius: 999,
-    backgroundColor: "transparent",
     marginRight: 8,
   },
   statIconImage: {
-    width: 30,
-    height: 30,
+    width: 26,
+    height: 26,
     resizeMode: "contain",
   },
 
   statLabel: {
     color: COLORS.textSecondary,
-    fontSize: 13,
+    fontSize: 12,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 26,
     color: COLORS.text,
     fontWeight: "700",
     marginTop: 8,
-    textAlign: "center",
   },
 
   activityBubble: {
-    backgroundColor: "rgba(221,220,219,0.08)",
-    borderRadius: 24,
-    padding: 20,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
-    borderColor: "white",
-    marginBottom: 24,
+    borderColor: "rgba(255,255,255,0.09)",
+    marginBottom: 12,
   },
 
   activityTitle: {
     color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "500",
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   activitySub: {
@@ -655,10 +648,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   activityIconImage: {
-    width: 28,
-    height: 28,
+    width: 26,
+    height: 26,
     resizeMode: "contain",
-    transform: [{ scale: 1.25 }],
   },
 
   row: {
@@ -667,9 +659,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 
-  fullBubbleContentCentered: {
+  activityIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "rgba(253,123,65,0.12)",
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
 
   activityContent: {
@@ -678,11 +675,11 @@ const styles = StyleSheet.create({
 
   // Feed
   feedEmptyCard: {
-    backgroundColor: "rgba(221,220,219,0.08)",
-    borderRadius: 24,
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    padding: 24,
+    borderColor: "rgba(255,255,255,0.09)",
+    padding: 28,
     alignItems: "center",
     gap: 8,
   },
@@ -695,13 +692,13 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: "center",
-    lineHeight: 18,
+    lineHeight: 19,
   },
   feedEmptyAction: {
-    marginTop: 4,
+    marginTop: 6,
     backgroundColor: COLORS.primary,
     borderRadius: 999,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 10,
   },
   feedEmptyActionText: {
@@ -713,11 +710,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   feedCard: {
-    backgroundColor: "rgba(221,220,219,0.08)",
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.09)",
     borderRadius: 18,
-    padding: 12,
+    padding: 14,
     gap: 10,
   },
   feedAnglerRow: {
@@ -738,17 +735,18 @@ const styles = StyleSheet.create({
   },
   feedCatchRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
   feedThumb: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    width: 72,
+    height: 72,
+    borderRadius: 12,
     resizeMode: "cover",
   },
   feedCatchContent: {
     flex: 1,
-    gap: 3,
+    gap: 4,
+    justifyContent: "center",
   },
   feedSpecies: {
     color: COLORS.text,

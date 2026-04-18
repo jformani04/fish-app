@@ -143,6 +143,12 @@ export default function CatchMapScreen() {
   if (loading) {
     return (
       <View style={styles.centeredState}>
+        <Pressable
+          onPress={() => router.replace("/(tabs)/home")}
+          style={[styles.stateBackButton, { top: insets.top + 12 }]}
+        >
+          <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
+        </Pressable>
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.centeredText}>Loading catch map...</Text>
       </View>
@@ -152,6 +158,12 @@ export default function CatchMapScreen() {
   if (activePins.length === 0) {
     return (
       <View style={styles.centeredState}>
+        <Pressable
+          onPress={() => router.replace("/(tabs)/home")}
+          style={[styles.stateBackButton, { top: insets.top + 12 }]}
+        >
+          <ArrowLeft color={COLORS.text} size={20} strokeWidth={2.4} />
+        </Pressable>
         <Text style={styles.centeredText}>
           {filterMode === "mine" ? "No catches yet" : "No friend catches to show"}
         </Text>
@@ -319,10 +331,10 @@ function FilterToggle({
 const toggleStyles = StyleSheet.create({
   wrap: {
     flexDirection: "row",
-    backgroundColor: "rgba(60,64,68,0.88)",
+    backgroundColor: "rgba(17,19,21,0.90)",
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.18)",
     padding: 3,
   },
   btn: {
@@ -359,6 +371,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 8,
   },
+  stateBackButton: {
+    position: "absolute",
+    left: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
   centeredText: {
     color: COLORS.text,
     fontSize: 16,
@@ -388,9 +412,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(60,64,68,0.88)",
+    backgroundColor: "rgba(17,19,21,0.90)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
+    borderColor: "rgba(255,255,255,0.18)",
   },
   titleWrap: {
     flex: 1,
