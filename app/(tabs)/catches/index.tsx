@@ -177,7 +177,9 @@ export default function CatchesScreen() {
                     <View
                       style={[
                         styles.visibilityPill,
-                        catchLog.syncStatus === "pending"
+                        catchLog.syncStatus === "failed"
+                          ? styles.visibilityPillFailed
+                          : catchLog.syncStatus === "pending"
                           ? styles.visibilityPillPending
                           : catchLog.isPublic
                           ? styles.visibilityPillPublic
@@ -187,18 +189,22 @@ export default function CatchesScreen() {
                       <Text
                         style={[
                           styles.visibilityPillText,
-                          catchLog.syncStatus === "pending"
+                          catchLog.syncStatus === "failed"
+                            ? styles.visibilityPillTextFailed
+                            : catchLog.syncStatus === "pending"
                             ? styles.visibilityPillTextPending
                             : catchLog.isPublic
                             ? styles.visibilityPillTextPublic
                             : styles.visibilityPillTextPrivate,
                         ]}
                       >
-                        {catchLog.syncStatus === "pending"
+                        {catchLog.syncStatus === "failed"
+                          ? "Failed"
+                          : catchLog.syncStatus === "pending"
                           ? "Pending"
                           : catchLog.isPublic
-                            ? "Public"
-                            : "Private"}
+                          ? "Public"
+                          : "Private"}
                       </Text>
                     </View>
                   </View>
@@ -439,6 +445,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(251,191,36,0.18)",
     borderColor: "rgba(251,191,36,0.35)",
   },
+  visibilityPillFailed: {
+    backgroundColor: "rgba(239,68,68,0.18)",
+    borderColor: "rgba(239,68,68,0.35)",
+  },
   visibilityPillPrivate: {
     backgroundColor: "rgba(253,123,65,0.2)",
     borderColor: "rgba(253,123,65,0.35)",
@@ -452,6 +462,9 @@ const styles = StyleSheet.create({
   },
   visibilityPillTextPending: {
     color: "#fbbf24",
+  },
+  visibilityPillTextFailed: {
+    color: "#f87171",
   },
   visibilityPillTextPrivate: {
     color: COLORS.primary,

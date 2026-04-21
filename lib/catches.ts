@@ -29,7 +29,7 @@ export interface CatchLog {
   date: string;
   latitude?: number | null;
   longitude?: number | null;
-  syncStatus?: "pending" | "synced";
+  syncStatus?: "pending" | "synced" | "failed";
 }
 
 export type MapCatchPin = {
@@ -322,7 +322,8 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<Create
   const payload = {
     id: catchId,
     user_id: user.id,
-    image_url: catchLog.imageUrl,
+    // Never store a local file:// URI in the DB — background upload handles it
+    image_url: isLocalFileUri(catchLog.imageUrl) ? "" : catchLog.imageUrl,
     species: catchLog.species,
     length: catchLog.length,
     weight: catchLog.weight,
@@ -535,6 +536,7 @@ export async function syncPendingCatchLogs(): Promise<number> {
       }
 
       if (isLikelyNetworkError(error)) {
+        // Transient — preserve current status, retry on next connection
         await upsertPendingCatchRecord(user.id, {
           ...record,
           lastError: getUserFacingErrorMessage(error, "Network issue while syncing."),
@@ -542,8 +544,10 @@ export async function syncPendingCatchLogs(): Promise<number> {
         break;
       }
 
+      // Permanent error — mark failed so the user can see it; still retried on next sync
       await upsertPendingCatchRecord(user.id, {
         ...record,
+        catchLog: { ...record.catchLog, syncStatus: "failed" },
         lastError: getUserFacingErrorMessage(error, "Unable to sync this catch."),
       });
     }
@@ -586,36 +590,31 @@ async function runCatchMutationWithCoordinateFallback(
   execute: (payload: Record<string, unknown>) => Promise<{ error: any }>,
   payload: Record<string, unknown>
 ) {
-  let lastError: any = null;
-  const legacyPayload = stripOptionalColumns(payload, [
-    "hide_location",
-    "is_favorite",
-    "latitude",
-    "longitude",
-  ]);
+  // Try full payload first (expected case: schema has all columns)
+  const attempt = await execute(payload);
+  if (!attempt.error) return null;
 
-  console.log("QUERY USING PAIR:", {
-    latitude: "not persisted remotely",
-    longitude: "not persisted remotely",
-  });
+  const err = attempt.error;
 
-  const legacyAttempt = await execute(legacyPayload);
-  if (!legacyAttempt.error) {
-    return null;
-  }
+  // Gracefully degrade if optional columns are missing from the schema
+  const missingOptional =
+    isMissingColumnError(err, "hide_location") ||
+    isMissingColumnError(err, "is_favorite") ||
+    isMissingColumnError(err, "latitude") ||
+    isMissingColumnError(err, "longitude");
 
-  lastError = legacyAttempt.error;
-
-  if (
-    lastError &&
-    (isMissingColumnError(lastError, "hide_location") ||
-      isMissingColumnError(lastError, "is_favorite"))
-  ) {
-    const retry = await execute(stripOptionalColumns(payload, ["hide_location", "is_favorite"]));
+  if (missingOptional) {
+    const fallback = stripOptionalColumns(payload, [
+      "hide_location",
+      "is_favorite",
+      "latitude",
+      "longitude",
+    ]);
+    const retry = await execute(fallback);
     return retry.error;
   }
 
-  return lastError;
+  return err;
 }
 
 function isDuplicatePrimaryKeyError(error: unknown) {
@@ -641,7 +640,7 @@ function mergeCatchLists(remote: CatchLog[], pending: CatchLog[]) {
   const merged = new Map<string, CatchLog>();
 
   remote.forEach((catchLog) => merged.set(catchLog.id, { ...catchLog, syncStatus: "synced" }));
-  pending.forEach((catchLog) => merged.set(catchLog.id, { ...catchLog, syncStatus: "pending" }));
+  pending.forEach((catchLog) => merged.set(catchLog.id, catchLog));
 
   return [...merged.values()].sort((a, b) => getCatchSortTime(b) - getCatchSortTime(a));
 }
@@ -697,7 +696,7 @@ async function upsertPendingCatchRecord(
     lastError: nextRecord.lastError ?? null,
     catchLog: {
       ...nextRecord.catchLog,
-      syncStatus: "pending",
+      syncStatus: nextRecord.catchLog.syncStatus === "failed" ? "failed" : "pending",
     },
   };
 

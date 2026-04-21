@@ -258,6 +258,29 @@ export default function EditCatchScreen() {
   // Local file URI waiting to be uploaded when saving a new catch
   const [pendingLocalUri, setPendingLocalUri] = useState<string | null>(null);
 
+  // GPS prefill runs after the form is visible (non-blocking)
+  useEffect(() => {
+    if (!isNew) return;
+
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") return;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        setPickerCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        const geo = await Location.reverseGeocodeAsync(loc.coords);
+        if (geo.length) {
+          const city = geo[0].city || geo[0].subregion || geo[0].region || "";
+          const area = geo[0].region || geo[0].country || "";
+          const label = [city, area].filter(Boolean).join(", ");
+          if (label) setForm((prev) => (prev.location ? prev : { ...prev, location: label }));
+        }
+      } catch {
+        // non-critical
+      }
+    })();
+  }, [isNew]);
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -282,24 +305,6 @@ export default function EditCatchScreen() {
           }));
           setTimeValue(now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }));
           if (initialImageUri) setPendingLocalUri(initialImageUri);
-
-          // GPS prefill (best-effort)
-          try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status === "granted") {
-              const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-              setPickerCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-              const geo = await Location.reverseGeocodeAsync(loc.coords);
-              if (geo.length) {
-                const city = geo[0].city || geo[0].subregion || geo[0].region || "";
-                const area = geo[0].region || geo[0].country || "";
-                const label = [city, area].filter(Boolean).join(", ");
-                if (label) setForm((prev) => (prev.location ? prev : { ...prev, location: label }));
-              }
-            }
-          } catch {
-            // non-critical
-          }
 
           hasLoadedInitialData.current = true;
           return;
@@ -434,13 +439,10 @@ export default function EditCatchScreen() {
       setSaveStatus("saving");
       setError(null);
 
-      let imageUrl = form.imageUrl;
-      if (pendingLocalUri) {
-        imageUrl = await uploadCatchPhoto(pendingLocalUri);
-      }
-
+      // Pass local URI so the pending queue can upload it on sync.
+      // createCatchLog strips local URIs from the live DB insert.
       const payload = buildSavePayload(
-        { ...form, imageUrl },
+        { ...form, imageUrl: pendingLocalUri ?? "" },
         lengthUnit,
         weightUnit,
         temperatureUnit
@@ -454,15 +456,30 @@ export default function EditCatchScreen() {
         longitude: pickerCoords?.longitude ?? null,
       });
 
-      Alert.alert(
-        result.syncStatus === "pending" ? "Saved Offline" : "Catch Logged!",
-        result.syncStatus === "pending"
-          ? "Your catch was saved on this device and will upload automatically when you're back online."
-          : "Your catch has been saved.",
-        [
-        { text: "View Catches", onPress: () => router.replace("/catches") },
-        ]
-      );
+      if (result.syncStatus === "pending") {
+        Alert.alert(
+          "Saved Offline",
+          "Your catch was saved on this device and will upload automatically when you're back online.",
+          [{ text: "View Catches", onPress: () => router.replace("/catches") }]
+        );
+      } else {
+        router.replace("/catches");
+      }
+
+      // Upload image in the background and patch the catch record once done
+      if (pendingLocalUri && result.syncStatus === "synced") {
+        uploadCatchPhoto(pendingLocalUri)
+          .then((imageUrl) =>
+            updateCatchLog({
+              id: result.catchId,
+              ...buildSavePayload({ ...form, imageUrl }, lengthUnit, weightUnit, temperatureUnit),
+              date: isoDate,
+              latitude: pickerCoords?.latitude ?? null,
+              longitude: pickerCoords?.longitude ?? null,
+            })
+          )
+          .catch(() => {});
+      }
     } catch (err: any) {
       setSaveStatus("error");
       setError(err?.message ?? "Unable to save catch.");
