@@ -102,6 +102,13 @@ type CreateCatchLogResult = {
 const PENDING_CATCHES_STORAGE_KEY = "anglr.pending-catches.v1";
 const REQUEST_TIMEOUT_MS = 12000;
 
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
 function debugLog(message: string, payload?: unknown) {
   if (!DEBUG) return;
   if (payload === undefined) {
@@ -311,7 +318,7 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<Create
 
   debugLog("create catch user_id", user.id);
 
-  const catchId = crypto.randomUUID();
+  const catchId = generateUUID();
   const catchLog: CatchLog = {
     ...input,
     id: catchId,

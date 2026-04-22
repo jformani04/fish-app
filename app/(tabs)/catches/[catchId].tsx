@@ -1056,7 +1056,7 @@ export default function EditCatchScreen() {
           <View style={styles.toggleRow}>
             <View>
               <Text style={styles.toggleTitle}>
-                {form.hideLocation ? "Hide Location" : "Show Location"}
+                {form.hideLocation ? "Location Hidden" : "Location Shown"}
               </Text>
               <Text style={styles.toggleSubtitle}>
                 Hide this catch location from other users when shared
