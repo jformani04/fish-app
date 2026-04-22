@@ -291,7 +291,7 @@ export async function getFriendCatchPins(
       .from("catch_logs")
       .select("*")
       .in("user_id", friendIds)
-      .eq("is_public", true)
+      .or("is_public.eq.true,is_friends_only.eq.true")
   );
 
   return rows.flatMap((row) => {
@@ -338,7 +338,7 @@ export async function getFriendMapPins(
       .from("catch_logs")
       .select("*")
       .in("user_id", friendIds)
-      .eq("is_public", true)
+      .or("is_public.eq.true,is_friends_only.eq.true")
   )).flatMap((row) => {
     if (row.hide_location || !hasResolvedCoordinates(row)) {
       return [];
@@ -464,16 +464,22 @@ export async function getFriendFeed(friendIds: string[]): Promise<FeedItem[]> {
       "id, image_url, species, length, weight, location, date, user_id, created_at"
     )
     .in("user_id", friendIds)
-    .eq("is_public", true)
+    .or("is_public.eq.true,is_friends_only.eq.true")
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(friendIds.length * 10);
 
   if (error) throw error;
   if (!rows || rows.length === 0) return [];
 
-  const uniqueUserIds = [
-    ...new Set((rows as any[]).map((r) => r.user_id as string)),
-  ];
+  // Keep only the most recent catch per friend (rows are already sorted newest-first)
+  const seenUserIds = new Set<string>();
+  const dedupedRows = (rows as any[]).filter((r) => {
+    if (seenUserIds.has(r.user_id as string)) return false;
+    seenUserIds.add(r.user_id as string);
+    return true;
+  });
+
+  const uniqueUserIds = [...seenUserIds];
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
     .select("id, username, avatar_url")
@@ -485,7 +491,7 @@ export async function getFriendFeed(friendIds: string[]): Promise<FeedItem[]> {
     ((profilesData ?? []) as any[]).map((p) => [p.id as string, p])
   );
 
-  return (rows as any[]).map((row) => {
+  return dedupedRows.map((row) => {
     const profile = profileMap.get(row.user_id as string);
     return {
       id: row.id as string,
@@ -556,7 +562,7 @@ export async function getFriendPublicCatches(friendId: string) {
       "id, image_url, species, length, weight, location, date, is_public, hide_location"
     )
     .eq("user_id", friendId)
-    .eq("is_public", true)
+    .or("is_public.eq.true,is_friends_only.eq.true")
     .order("created_at", { ascending: false })
     .limit(30);
 

@@ -254,33 +254,53 @@ export default function EditCatchScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
   const hasLoadedInitialData = useRef(false);
   const lastSavedSnapshot = useRef<string>("");
   // Local file URI waiting to be uploaded when saving a new catch
   const [pendingLocalUri, setPendingLocalUri] = useState<string | null>(null);
 
-  // GPS prefill runs after the form is visible (non-blocking)
+  // GPS runs after data loads for both new catches and existing ones without coordinates.
+  // Uses a functional update so it never overwrites a location the user already set.
   useEffect(() => {
-    if (!isNew) return;
+    if (loading) return;
+
+    let cancelled = false;
+    setGpsLoading(true);
 
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        if (status !== "granted" || cancelled) return;
+
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setPickerCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+        if (cancelled) return;
+
+        setPickerCoords((current) =>
+          current !== null
+            ? current
+            : { latitude: loc.coords.latitude, longitude: loc.coords.longitude }
+        );
+
         const geo = await Location.reverseGeocodeAsync(loc.coords);
-        if (geo.length) {
+        if (!cancelled && geo.length) {
           const city = geo[0].city || geo[0].subregion || geo[0].region || "";
           const area = geo[0].region || geo[0].country || "";
           const label = [city, area].filter(Boolean).join(", ");
           if (label) setForm((prev) => (prev.location ? prev : { ...prev, location: label }));
         }
       } catch {
-        // non-critical
+        // GPS unavailable — non-critical
+      } finally {
+        if (!cancelled) setGpsLoading(false);
       }
     })();
-  }, [isNew]);
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   useEffect(() => {
     const load = async () => {
@@ -792,7 +812,12 @@ export default function EditCatchScreen() {
             style={styles.locationPickerButton}
             onPress={() => setShowPicker(true)}
           >
-            {pickerCoords ? (
+            {gpsLoading && !pickerCoords ? (
+              <View style={styles.locationGpsRow}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.locationPickerPlaceholder}>Detecting GPS…</Text>
+              </View>
+            ) : pickerCoords ? (
               <View style={{ flex: 1 }}>
                 <Text style={styles.locationPickerName} numberOfLines={1}>
                   {form.location || "Location selected"}
@@ -1399,6 +1424,12 @@ const styles = StyleSheet.create({
   },
   centeredFieldInput: {
     textAlign: "center",
+  },
+  locationGpsRow: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   locationPickerButton: {
     flexDirection: "row",

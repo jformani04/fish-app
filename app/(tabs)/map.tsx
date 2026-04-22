@@ -66,8 +66,10 @@ const DEBUG = process.env.EXPO_PUBLIC_DEBUG === "1";
 
 function hasValidCoords(catchLog: CatchLog) {
   return (
-    Number.isFinite(Number(catchLog.latitude)) &&
-    Number.isFinite(Number(catchLog.longitude))
+    catchLog.latitude != null &&
+    catchLog.longitude != null &&
+    Number.isFinite(catchLog.latitude) &&
+    Number.isFinite(catchLog.longitude)
   );
 }
 
@@ -88,8 +90,8 @@ function mapMinePin(
   return {
     id: catchLog.id,
     species: catchLog.species,
-    latitude: Number(catchLog.latitude),
-    longitude: Number(catchLog.longitude),
+    latitude: catchLog.latitude as number,
+    longitude: catchLog.longitude as number,
     imageUrl: catchLog.imageUrl,
     date: catchLog.date,
     weight: catchLog.weight,
@@ -148,6 +150,13 @@ export default function CatchMapScreen() {
   const [currentRegion, setCurrentRegion] = useState<Region>(DEFAULT_REGION);
   const [isMapReady, setIsMapReady] = useState(false);
   const [isMapLaidOut, setIsMapLaidOut] = useState(false);
+
+  // Reset map-ready flag whenever the MapView remounts (reloadToken changes).
+  // Without this, onMapReady fires on a fresh instance but setIsMapReady(true)
+  // is a no-op because state was already true, so fitToCoordinates never runs.
+  useEffect(() => {
+    setIsMapReady(false);
+  }, [reloadToken]);
   const [mineState, setMineState] = useState<PinState>({
     pins: [],
     loading: true,
@@ -178,8 +187,7 @@ export default function CatchMapScreen() {
   );
   const hasActiveError = !!activeState.error && activePins.length === 0;
   const isActiveLoading = activeState.loading;
-  const mapKey = `${filterMode}:${selectedFriendId}:${reloadToken}`;
-  const activeCoordinates = useMemo(
+const activeCoordinates = useMemo(
     () =>
       renderablePins.map((pin) => ({
           latitude: pin.latitude,
@@ -364,7 +372,6 @@ export default function CatchMapScreen() {
       renderablePins: renderablePins.length,
       activeCoordinates,
       filterMode,
-      mapKey,
     });
 
     if (!mapRef.current || !isMapReady || !isMapLaidOut || activeCoordinates.length === 0) {
@@ -403,7 +410,6 @@ export default function CatchMapScreen() {
     filterMode,
     isMapLaidOut,
     isMapReady,
-    mapKey,
     renderablePins.length,
   ]);
 
@@ -449,7 +455,7 @@ export default function CatchMapScreen() {
       onLayout={() => setIsMapLaidOut(true)}
     >
       <MapView
-        key={mapKey}
+        key={String(reloadToken)}
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
