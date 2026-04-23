@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { getProfile, LengthUnit, TempUnit, WeightUnit } from "@/lib/profile";
 import { router, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
-import { ArrowLeft, Camera, ChevronDown, Globe, Lock, Users } from "lucide-react-native";
+import { ArrowLeft, Camera, ChevronDown, Globe, Lock, Tag, Users, X } from "lucide-react-native";
 import LocationPickerModal, { LocationResult } from "@/components/LocationPickerModal";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -94,6 +94,15 @@ const EMPTY_FORM: CatchLogForm = {
   hideLocation: false,
   date: "",
 };
+
+function normalizeGroupName(raw: string): string {
+  const trimmed = raw.trim().replace(/\s+/g, " ").slice(0, 30);
+  if (!trimmed) return "";
+  return trimmed
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 function parseMeasurement<T extends string>(
   rawValue: string,
@@ -248,6 +257,7 @@ export default function EditCatchScreen() {
   const [showLureMatches, setShowLureMatches] = useState(false);
   const [methodQuery, setMethodQuery] = useState("");
   const [showMethodMatches, setShowMethodMatches] = useState(false);
+  const [pinGroupValue, setPinGroupValue] = useState("");
   const [timeValue, setTimeValue] = useState(formatCurrentTime());
   const [showPicker, setShowPicker] = useState(false);
   const [pickerCoords, setPickerCoords] = useState<{
@@ -386,6 +396,7 @@ export default function EditCatchScreen() {
         setWeatherQuery(hydratedForm.weather);
         setLureQuery(hydratedForm.lure);
         setMethodQuery(hydratedForm.method);
+        setPinGroupValue(catchLog.pinGroup ?? "");
 
         const initPickerCoords =
           typeof catchLog.latitude === "number" &&
@@ -413,7 +424,7 @@ export default function EditCatchScreen() {
     load();
   }, [catchId]);
 
-  const setField = (field: keyof CatchLogForm, value: string | boolean) => {
+  const setField = (field: keyof CatchLogForm, value: string | boolean | null) => {
     setForm((prev) => ({ ...prev, [field]: value } as CatchLogForm));
   };
 
@@ -1039,6 +1050,47 @@ export default function EditCatchScreen() {
           </View>
 
           <View style={styles.sectionBubble}>
+          <Text style={styles.groupTitle}>Pin Group</Text>
+          <Text style={styles.pinGroupDescription}>Assign this catch to a named group for filtering and organization</Text>
+          <Text style={styles.sectionLabel}>Group Name</Text>
+          <View style={styles.pinGroupInputRow}>
+            <TextInput
+              style={[styles.input, styles.pinGroupInput]}
+              placeholder="e.g. Vacation, Tournament, Weekend..."
+              placeholderTextColor={COLORS.textSecondary}
+              value={pinGroupValue}
+              maxLength={30}
+              onChangeText={(v) => {
+                setPinGroupValue(v);
+                setField("pinGroup", v.trim() || null);
+              }}
+              onBlur={() => {
+                const normalized = normalizeGroupName(pinGroupValue);
+                setPinGroupValue(normalized);
+                setField("pinGroup", normalized || null);
+              }}
+            />
+            {!!pinGroupValue && (
+              <Pressable
+                style={styles.pinGroupClearButton}
+                onPress={() => {
+                  setPinGroupValue("");
+                  setField("pinGroup", null);
+                }}
+              >
+                <X color={COLORS.textSecondary} size={14} strokeWidth={2.5} />
+              </Pressable>
+            )}
+          </View>
+          {!!form.pinGroup && (
+            <View style={styles.pinGroupPreview}>
+              <Tag color={COLORS.primary} size={12} strokeWidth={2} />
+              <Text style={styles.pinGroupPreviewText}>{form.pinGroup}</Text>
+            </View>
+          )}
+          </View>
+
+          <View style={styles.sectionBubble}>
           <Text style={styles.groupTitle}>Privacy & Visibility</Text>
 
           {/* 3-way visibility selector */}
@@ -1592,6 +1644,42 @@ const styles = StyleSheet.create({
   pickImageButtonText: {
     color: COLORS.text,
     fontSize: 14,
+    fontWeight: "600",
+  },
+  pinGroupDescription: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 6,
+    lineHeight: 16,
+  },
+  pinGroupInputRow: {
+    position: "relative",
+    justifyContent: "center",
+  },
+  pinGroupInput: {
+    paddingRight: 40,
+  },
+  pinGroupClearButton: {
+    position: "absolute",
+    right: 12,
+    padding: 4,
+  },
+  pinGroupPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+    backgroundColor: "rgba(253,123,65,0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(253,123,65,0.25)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: "flex-start",
+  },
+  pinGroupPreviewText: {
+    color: COLORS.primary,
+    fontSize: 12,
     fontWeight: "600",
   },
   centerScreen: {

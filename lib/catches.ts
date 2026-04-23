@@ -31,6 +31,7 @@ export interface CatchLog {
   latitude?: number | null;
   longitude?: number | null;
   syncStatus?: "pending" | "synced" | "failed";
+  pinGroup?: string | null;
 }
 
 export type MapCatchPin = {
@@ -63,6 +64,7 @@ type CatchLogRow = {
   created_at: string;
   latitude?: number | null;
   longitude?: number | null;
+  pin_group?: string | null;
 };
 
 type CatchLogUpdateRow = {
@@ -83,6 +85,7 @@ type CatchLogUpdateRow = {
   date: string;
   latitude?: number | null;
   longitude?: number | null;
+  pin_group: string | null;
 };
 
 type CatchLogInsertInput = Omit<CatchLog, "id">;
@@ -153,6 +156,7 @@ export function mapCatchLogRowToCatchLog(row: CatchLogRow): CatchLog {
     latitude: normalizedRow.latitude,
     longitude: normalizedRow.longitude,
     syncStatus: "synced",
+    pinGroup: row.pin_group ?? null,
   };
 }
 
@@ -175,6 +179,7 @@ export function mapCatchLogToUpdateRow(catchLog: CatchLog): CatchLogUpdateRow {
     date: catchLog.date,
     latitude: catchLog.latitude ?? null,
     longitude: catchLog.longitude ?? null,
+    pin_group: catchLog.pinGroup ?? null,
   };
 }
 
@@ -352,6 +357,7 @@ export async function createCatchLog(input: CatchLogInsertInput): Promise<Create
     date: catchLog.date,
     latitude: catchLog.latitude ?? null,
     longitude: catchLog.longitude ?? null,
+    pin_group: catchLog.pinGroup ?? null,
   };
 
   try {
@@ -498,6 +504,91 @@ export async function seedDevCatchLog(userId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function batchUpdateCatchLogs(
+  catchIds: string[],
+  update: {
+    isFavorite?: boolean;
+    isPublic?: boolean;
+    isFriendsOnly?: boolean;
+    pinGroup?: string | null;
+  }
+): Promise<void> {
+  if (catchIds.length === 0) return;
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("No authenticated user");
+
+  const dbUpdate: Record<string, unknown> = {};
+  if (update.isFavorite !== undefined) dbUpdate.is_favorite = update.isFavorite;
+  if (update.isPublic !== undefined) dbUpdate.is_public = update.isPublic;
+  if (update.isFriendsOnly !== undefined) dbUpdate.is_friends_only = update.isFriendsOnly;
+  if (update.pinGroup !== undefined) dbUpdate.pin_group = update.pinGroup;
+  if (Object.keys(dbUpdate).length === 0) return;
+
+  // 1. Always update pending catches in AsyncStorage first — no network required.
+  const allRecords = await getAllPendingCatchRecords();
+  const hasRelevant = allRecords.some(
+    (r) => r.userId === user.id && catchIds.includes(r.catchLog.id)
+  );
+  if (hasRelevant) {
+    const updated = allRecords.map((record) => {
+      if (record.userId !== user.id || !catchIds.includes(record.catchLog.id)) return record;
+      const patched: CatchLog = { ...record.catchLog };
+      if (update.isFavorite !== undefined) patched.isFavorite = update.isFavorite;
+      if (update.isPublic !== undefined) patched.isPublic = update.isPublic;
+      if (update.isFriendsOnly !== undefined) patched.isFriendsOnly = update.isFriendsOnly;
+      if (update.pinGroup !== undefined) patched.pinGroup = update.pinGroup;
+      return { ...record, catchLog: patched };
+    });
+    await AsyncStorage.setItem(PENDING_CATCHES_STORAGE_KEY, JSON.stringify(updated));
+  }
+
+  // 2. Update synced catches in Supabase. If offline, pending catches are already
+  //    handled above so silently skip the server update rather than throwing.
+  const { error } = await withTimeout<any>(
+    supabase.from("catch_logs").update(dbUpdate).in("id", catchIds).eq("user_id", user.id),
+    REQUEST_TIMEOUT_MS,
+    "Batch update took too long."
+  );
+  if (error && !isLikelyNetworkError(error)) {
+    throw wrapCatchError(error, "Unable to update selected catches.");
+  }
+}
+
+export async function batchDeleteCatchLogs(catchIds: string[]): Promise<void> {
+  if (catchIds.length === 0) return;
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  if (!user) throw new Error("No authenticated user");
+
+  // 1. Remove pending catches from AsyncStorage first — no network required.
+  const allRecords = await getAllPendingCatchRecords();
+  const remaining = allRecords.filter(
+    (r) => !(r.userId === user.id && catchIds.includes(r.catchLog.id))
+  );
+  if (remaining.length !== allRecords.length) {
+    await AsyncStorage.setItem(PENDING_CATCHES_STORAGE_KEY, JSON.stringify(remaining));
+  }
+
+  // 2. Delete synced catches from Supabase. Silently skip if offline.
+  const { error } = await withTimeout<any>(
+    supabase.from("catch_logs").delete().in("id", catchIds).eq("user_id", user.id),
+    REQUEST_TIMEOUT_MS,
+    "Batch delete took too long."
+  );
+  if (error && !isLikelyNetworkError(error)) {
+    throw wrapCatchError(error, "Unable to delete selected catches.");
+  }
+}
+
 export async function syncPendingCatchLogs(): Promise<number> {
   // getSession is cached and never throws — use it to bail out fast when signed out
   const { data: { session } } = await supabase.auth.getSession();
@@ -542,6 +633,7 @@ export async function syncPendingCatchLogs(): Promise<number> {
         date: catchLog.date,
         latitude: catchLog.latitude ?? null,
         longitude: catchLog.longitude ?? null,
+        pin_group: catchLog.pinGroup ?? null,
       });
 
       await removePendingCatchRecord(user.id, record.catchLog.id);
@@ -625,9 +717,10 @@ async function runCatchMutationWithCoordinateFallback(
     // If still failing (e.g. other legacy columns also missing), drop them too.
     if (
       isMissingColumnError(retry.error, "hide_location") ||
-      isMissingColumnError(retry.error, "is_favorite")
+      isMissingColumnError(retry.error, "is_favorite") ||
+      isMissingColumnError(retry.error, "pin_group")
     ) {
-      const legacy = stripOptionalColumns(withoutCoords, ["hide_location", "is_favorite"]);
+      const legacy = stripOptionalColumns(withoutCoords, ["hide_location", "is_favorite", "pin_group"]);
       return (await execute(legacy)).error;
     }
 
@@ -638,9 +731,10 @@ async function runCatchMutationWithCoordinateFallback(
   if (
     isMissingColumnError(err, "hide_location") ||
     isMissingColumnError(err, "is_favorite") ||
-    isMissingColumnError(err, "is_friends_only")
+    isMissingColumnError(err, "is_friends_only") ||
+    isMissingColumnError(err, "pin_group")
   ) {
-    const legacy = stripOptionalColumns(payload, ["hide_location", "is_favorite", "is_friends_only"]);
+    const legacy = stripOptionalColumns(payload, ["hide_location", "is_favorite", "is_friends_only", "pin_group"]);
     return (await execute(legacy)).error;
   }
 

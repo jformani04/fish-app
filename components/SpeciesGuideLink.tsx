@@ -1,9 +1,9 @@
 import { COLORS } from "@/lib/colors";
 import { getSpeciesArticleWithCache, speciesNameToSlug } from "@/lib/speciesArticles";
 import { router } from "expo-router";
-import { ChevronRight } from "lucide-react-native";
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { BookOpen, ChevronRight } from "lucide-react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View, ViewStyle } from "react-native";
 
 type SpeciesGuideLinkProps = {
   speciesName?: string | null;
@@ -19,6 +19,7 @@ export default function SpeciesGuideLink({
     [speciesName]
   );
   const [articleSlug, setArticleSlug] = useState<string | null>(null);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let cancelled = false;
@@ -59,41 +60,89 @@ export default function SpeciesGuideLink({
     };
   }, [normalizedSpecies]);
 
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 20,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 20,
+    }).start();
+  };
+
   if (!articleSlug) return null;
 
   return (
-    <Pressable
-      style={[styles.linkCard, style]}
-      onPress={() =>
-        router.push({
-          pathname: "/articles/[slug]",
-          params: { slug: articleSlug },
-        })
-      }
-    >
-      <Text style={styles.linkText}>View Species Guide</Text>
-      <ChevronRight color={COLORS.primary} size={16} strokeWidth={2.2} />
-    </Pressable>
+    <Animated.View style={[{ transform: [{ scale: scaleAnim }] }, style]}>
+      <Pressable
+        style={({ pressed }) => [styles.linkCard, pressed && styles.linkCardPressed]}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onPress={() =>
+          router.push({
+            pathname: "/articles/[slug]",
+            params: { slug: articleSlug },
+          })
+        }
+      >
+        <View style={styles.iconWrap}>
+          <BookOpen color={COLORS.primary} size={18} strokeWidth={2.2} />
+        </View>
+        <View style={styles.textWrap}>
+          <Text style={styles.linkTitle}>Species Guide</Text>
+          <Text style={styles.linkSubtext}>Tap to view tips & info</Text>
+        </View>
+        <ChevronRight color={COLORS.primary} size={16} strokeWidth={2.5} />
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   linkCard: {
-    marginTop: 10,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "rgba(253,123,65,0.28)",
-    backgroundColor: "rgba(253,123,65,0.08)",
+    borderColor: "rgba(253,123,65,0.3)",
+    backgroundColor: "rgba(253,123,65,0.09)",
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 10,
+    gap: 12,
   },
-  linkText: {
+  linkCardPressed: {
+    backgroundColor: "rgba(253,123,65,0.17)",
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(253,123,65,0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(253,123,65,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  linkTitle: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "700",
+    letterSpacing: 0.1,
+  },
+  linkSubtext: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
   },
 });
