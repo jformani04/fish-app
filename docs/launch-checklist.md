@@ -23,7 +23,7 @@ Status key: ✅ Ready | ⚠️ Needs attention | ❌ Blocker
 | E1 | Custom domain registered (e.g. `anglrapp.com`) | ❌ | Register domain; point to Vercel or hosting provider |
 | E2 | Custom SMTP configured in Supabase | ❌ | Auth → SMTP Settings → configure Resend/Postmark |
 | E3 | Password reset email delivered to inbox (not spam) | ❌ | Blocked by E2; test after SMTP is configured |
-| E4 | Password reset redirect URL on own domain | ❌ | Update `resetPasswordForEmail` redirect to `https://anglrapp.com/auth/reset-password` |
+| E4 | Password reset redirect URL on own domain | ❌ | Update `resetPasswordForEmail` redirect to `https://anglrapp.com/reset-password` |
 | E5 | Email templates customized with brand | ⚠️ | Templates exist in `email-templates/` but must be pasted into Supabase dashboard |
 
 ---

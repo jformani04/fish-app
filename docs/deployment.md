@@ -108,7 +108,7 @@ Before submitting to Google Play:
 4. Configure custom SMTP in Supabase (Auth → SMTP Settings):
    - Use Resend, Postmark, or SendGrid
    - Set the "From" address to `noreply@anglrapp.com`
-5. Update the password reset redirect to `https://anglrapp.com/auth/reset-password` (a web page that handles the token and deep-links back to the app).
+5. Update the password reset redirect to `https://anglrapp.com/reset-password` (a web page that handles the token and deep-links back to the app).
 
 ---
 

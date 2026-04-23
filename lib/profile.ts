@@ -194,13 +194,8 @@ export async function linkGoogleIdentity(): Promise<void> {
 }
 
 export async function enableEmailLogin(email: string): Promise<void> {
-  const redirectTo = AuthSession.makeRedirectUri({
-    scheme: "anglr",
-    path: "auth/callback",
-  });
-
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo,
+    redirectTo: "https://anglrapp.com/reset-password",
   });
   if (error) throw error;
 }

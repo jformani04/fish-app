@@ -39,7 +39,7 @@ export default function ForgotPassword() {
       setError(null);
 
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmed, {
-        redirectTo: "https://anglr-web.vercel.app/reset-password",
+        redirectTo: "https://anglrapp.com/reset-password",
       });
 
       if (resetError) throw resetError;
@@ -67,7 +67,7 @@ export default function ForgotPassword() {
           <View style={styles.successBox}>
             <Text style={styles.successTitle}>Check your inbox</Text>
             <Text style={styles.successText}>
-              If an account with that email exists, you'll receive a password reset link shortly.
+              If an account with that email exists, you&apos;ll receive a password reset link shortly.
             </Text>
             <TouchableOpacity onPress={() => router.back()} style={styles.successBackButton}>
               <Text style={styles.successBackText}>Back to Sign In</Text>

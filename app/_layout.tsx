@@ -25,7 +25,9 @@ export default function RootLayout() {
     const inTabsGroup = segments[0] === "(tabs)";
     const inLogRoute = segments[0] === "log";
     const inCallbackRoute = segments[0] === "auth" && segments[1] === "callback";
-    const inResetPasswordRoute = segments[0] === "auth" && segments[1] === "reset-password";
+    const inResetPasswordRoute =
+      segments[0] === "reset-password" ||
+      (segments[0] === "auth" && segments[1] === "reset-password");
     const inProtectedSignedInRoute = inTabsGroup || inLogRoute;
 
     const applyGuard = (hasSession: boolean) => {
@@ -84,6 +86,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="auth/callback" />
           <Stack.Screen name="auth/reset-password" />
+          <Stack.Screen name="reset-password" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="log" />
         </Stack>
